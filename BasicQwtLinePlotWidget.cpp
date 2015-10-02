@@ -24,10 +24,8 @@ using namespace std;
 cBasicQwtLinePlotWidget::cBasicQwtLinePlotWidget(QWidget *pParent) :
     QWidget(pParent),
     m_pUI(new Ui::cBasicQwtLinePlotWidget),
-    m_dXBegin(0.0),
-    m_dXEnd(1.0),
-    m_bXSpanChanged(true),
     m_bIsGridShown(true),
+    m_bShowVerticalLines(true),
     m_bIsPaused(false),
     m_bIsAutoscaleEnabled(false),
     m_u32Averaging(1),
@@ -42,6 +40,16 @@ cBasicQwtLinePlotWidget::cBasicQwtLinePlotWidget(QWidget *pParent) :
     //The background colour is not currently changable. A mutator can be added as necessary
     m_pUI->qwtPlot->setCanvasBackground(QBrush(QColor(Qt::black)));
     showPlotGrid(true);
+
+    //Make the axis and title font a little bit smaller
+    m_oYFont = m_pUI->qwtPlot->axisTitle(QwtPlot::yLeft).font();
+    m_oYFont.setPointSizeF(m_oYFont.pointSizeF() * 0.75);
+
+    m_oXFont = m_pUI->qwtPlot->axisTitle(QwtPlot::xBottom).font();
+    m_oXFont.setPointSizeF(m_oXFont.pointSizeF() * 0.75);
+
+    m_oTitleFont = m_pUI->qwtPlot->titleLabel()->font();
+    m_oTitleFont.setPointSizeF(m_oTitleFont.pointSizeF() * 0.7);
 
     //Set up other plot controls
     m_pPlotPicker = new cBasicQwtLinePlotPicker(QwtPlot::xBottom, QwtPlot::yLeft, QwtPicker::RectRubberBand, QwtPicker::AlwaysOn, m_pUI->qwtPlot->canvas());
@@ -113,21 +121,36 @@ void cBasicQwtLinePlotWidget::insertWidgetIntoControlFrame(QWidget* pNewWidget, 
     pLayout->insertWidget(u32Index, pNewWidget);
 
     if(bAddSpacerAfter)
-        pLayout->insertSpacerItem(u32Index + 1, new QSpacerItem(40, 20, QSizePolicy::Fixed, QSizePolicy::Fixed));
+        pLayout->insertSpacerItem(u32Index + 1, new QSpacerItem(20, 20, QSizePolicy::Fixed, QSizePolicy::Fixed));
 }
 
 
-void cBasicQwtLinePlotWidget::addData(const QVector<QVector<float> > &qvvfData, int64_t i64Timestamp_us)
+void cBasicQwtLinePlotWidget::addData(const QVector<float> &qvfXData, const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us)
 {
     //Safety flag which can be set by other threads if data is known not to be interpretable
     if(m_bRejectData)
         return;
 
     //Update X data
-    processXData(qvvfData[0].size(), i64Timestamp_us);
+    processXData(qvfXData, i64Timestamp_us);
 
     //Update Y data
-    processYData(qvvfData, i64Timestamp_us);
+    processYData(qvvfYData, i64Timestamp_us);
+
+    //Check if number of points to plot is base 2:
+    double dExponent = log2(m_qvdXDataToPlot.size());
+    double dIntegerPart; //Unused
+
+    if(modf(dExponent, &dIntegerPart) == 0.0)
+    {
+        sigUpdateXScaleBase(2);
+        //Plot grid lines along base 2 numbers
+    }
+    else
+    {
+        sigUpdateXScaleBase(10);
+        //Otherwise plot grid lines along base 10 numbers
+    }
 
     //Do log conversions if required
     for(uint32_t u32ChannelNo = 0; u32ChannelNo < (unsigned)m_qvvdYDataToPlot.size(); u32ChannelNo++)
@@ -169,47 +192,24 @@ void cBasicQwtLinePlotWidget::addData(const QVector<QVector<float> > &qvvfData, 
     m_oMutex.unlock();
 }
 
-void cBasicQwtLinePlotWidget::processXData(uint32_t u32NPoints, int64_t i64Timestamp_us)
+void cBasicQwtLinePlotWidget::processXData(const QVector<float> &qvfXData, int64_t i64Timestamp_us)
 {
     //This function populates the m_qvdXDataToPlot vector
     //In this basic implementation the input data is simply copied to the output array
-    //In derived versions of the class this function should overloaded
+    //In derived versions of the class this function should be overloaded
 
     Q_UNUSED(i64Timestamp_us);
 
-    //Update X data
-    m_oMutex.lockForRead(); //Ensure span doesn't change during this section
+    //Update number of samples in each channel
+    m_qvdXDataToPlot.resize(qvfXData.size());
 
-    if((uint32_t)m_qvdXDataToPlot.size() != u32NPoints || m_bXSpanChanged)
+    //Copy the input data to plot array
+    for(uint32_t u32SampleNo = 0; u32SampleNo < (uint32_t)qvfXData.size(); u32SampleNo++)
     {
-        m_qvdXDataToPlot.resize(u32NPoints);
-
-        double dInterval = (m_dXEnd - m_dXBegin) / (double)(m_qvdXDataToPlot.size() - 1);
-
-        for(uint32_t u32XTick = 0; u32XTick < u32NPoints; u32XTick++)
-        {
-            m_qvdXDataToPlot[u32XTick] = m_dXBegin + u32XTick * dInterval;
-        }
-
-        //Check if number of points is base 2:
-        double dExponent = log2(u32NPoints);
-        double dIntegerPart; //Unused
-
-        if(modf(dExponent, &dIntegerPart) == 0.0)
-        {
-            sigUpdateXScaleBase(2);
-            //Plot grid lines along base 2 numbers
-        }
-        else
-        {
-            sigUpdateXScaleBase(10);
-            //Otherwise plot grid lines along base 10 numbers
-        }
-
-        m_bXSpanChanged = false;
+        m_qvdXDataToPlot[u32SampleNo] = qvfXData[u32SampleNo];
     }
 
-    m_oMutex.unlock();
+    cout << "cBasicQwtLinePlotWidget::processXData(): m_qvdXDataToPlot is  " << m_qvdXDataToPlot.size() << " samples long." << endl;
 }
 
 
@@ -217,7 +217,7 @@ void cBasicQwtLinePlotWidget::processYData(const QVector<QVector<float> > &qvvfY
 {
     //This function populates the m_qvvdYDataToPlot vector
     //In this basic implementation the input data is simply copied to the output array
-    //In derived versions of the class this function should overloaded
+    //In derived versions of the class this function should be overloaded
 
     Q_UNUSED(i64Timestamp_us);
 
@@ -233,7 +233,7 @@ void cBasicQwtLinePlotWidget::processYData(const QVector<QVector<float> > &qvvfY
         m_qvvdYDataToPlot[u32ChannelNo].resize(qvvfYData[u32ChannelNo].size());
 
         //Copy the input data to plot array
-        for(uint32_t u32SampleNo = 0; u32SampleNo < qvvfYData[u32ChannelNo].size(); u32SampleNo++)
+        for(uint32_t u32SampleNo = 0; u32SampleNo < (uint32_t)qvvfYData[u32ChannelNo].size(); u32SampleNo++)
         {
             m_qvvdYDataToPlot[u32ChannelNo][u32SampleNo] = qvvfYData[u32ChannelNo][u32SampleNo];
         }
@@ -425,17 +425,6 @@ void cBasicQwtLinePlotWidget::enableRejectData(bool bEnable)
     m_bRejectData = bEnable;
 }
 
-void cBasicQwtLinePlotWidget::setXSpan(double dXBegin, double dXEnd)
-{
-    QWriteLocker oWriteLock(&m_oMutex);
-
-    m_dXBegin = dXBegin;
-    m_dXEnd = dXEnd;
-
-    //Flag for ploting code to update
-    m_bXSpanChanged = true;
-}
-
 void cBasicQwtLinePlotWidget::slotUpdatePlotData(unsigned int uiCurveNo, QVector<double> qvdXData, QVector<double> qvdYData, int64_t i64Timestamp_us)
 {
     //This function sends data to the actually plot widget in the GUI thread. This is necessary as draw the curve (i.e. updating the GUI) must be done in the GUI thread.
@@ -466,25 +455,49 @@ void cBasicQwtLinePlotWidget::slotUpdatePlotData(unsigned int uiCurveNo, QVector
 
     //Update timestamp in Title if needed
     if(m_bTimestampInTitleEnabled)
-        m_pUI->qwtPlot->setTitle( QString("%1 - %2").arg(m_qstrTitle).arg(AVN::stringFromTimestamp(i64Timestamp_us).c_str()) );
+    {
+        m_pUI->qwtPlot->setTitle( QString("%1 - %2").arg(m_qstrTitle).arg(AVN::stringFromTimestamp_full(i64Timestamp_us).c_str()) );
+    }
 }
 
 void cBasicQwtLinePlotWidget::slotUpdateScalesAndLabels()
 {
     if(m_qstrXUnit.length())
-        m_pUI->qwtPlot->setAxisTitle(QwtPlot::xBottom, QString("%1 [%2]").arg(m_qstrXLabel).arg(m_qstrXUnit));
+    {
+        QwtText oXLabel(QwtText(QString("%1 [%2]").arg(m_qstrXLabel).arg(m_qstrXUnit)) );
+        oXLabel.setFont(m_oXFont);
+
+        m_pUI->qwtPlot->setAxisTitle(QwtPlot::xBottom, oXLabel);
+    }
     else
-        m_pUI->qwtPlot->setAxisTitle(QwtPlot::xBottom, QString("%1").arg(m_qstrXLabel));
+    {
+        QwtText oXLabel( QwtText(QString("%1").arg(m_qstrXLabel)) );
+        oXLabel.setFont(m_oXFont);
+
+        m_pUI->qwtPlot->setAxisTitle(QwtPlot::xBottom, oXLabel);
+    }
 
     if(m_qstrYUnit.length())
-        m_pUI->qwtPlot->setAxisTitle(QwtPlot::yLeft, QString("%1 [%2]").arg(m_qstrYLabel).arg(m_qstrYUnit));
+    {
+        QwtText oYLabel( QString("%1 [%2]").arg(m_qstrYLabel).arg(m_qstrYUnit) );
+        oYLabel.setFont(m_oYFont);
+
+        m_pUI->qwtPlot->setAxisTitle(QwtPlot::yLeft, oYLabel);
+    }
     else
-        m_pUI->qwtPlot->setAxisTitle(QwtPlot::yLeft, QString("%1").arg(m_qstrYLabel));
+    {
+        QwtText oYLabel( QString("%1").arg(m_qstrYLabel) );
+        oYLabel.setFont(m_oYFont);
+
+        m_pUI->qwtPlot->setAxisTitle(QwtPlot::yLeft, oYLabel);
+    }
 
     m_pPlotPicker->setXUnit(m_qstrXUnit);
     m_pPlotPicker->setYUnit(m_qstrYUnit);
 
-    m_pUI->qwtPlot->setTitle(m_qstrTitle);
+    QwtText oTitle(m_qstrTitle);
+    oTitle.setFont(m_oTitleFont);
+    m_pUI->qwtPlot->setTitle(oTitle);
 
     for(uint32_t u32CurveNo = 0; u32CurveNo < (uint32_t)m_qvpPlotCurves.size() && u32CurveNo < (uint32_t)m_qvqstrCurveNames.size(); u32CurveNo++)
     {
@@ -551,29 +564,57 @@ void cBasicQwtLinePlotWidget::updateCurves()
     }
 }
 
-void cBasicQwtLinePlotWidget::slotDrawVerticalLines(QVector<double> qvdXValues, QVector<QString> qvqstrLabels)
+void cBasicQwtLinePlotWidget::slotDrawVerticalLines(QVector<double> qvdXValues)
 {
+    for(uint32_t u32LineNo = 0; u32LineNo < (uint32_t)m_qvpVerticalLines.size(); u32LineNo++)
+    {
+        m_qvpVerticalLines[u32LineNo]->detach();
+        delete m_qvpVerticalLines[u32LineNo];
+    }
+
     m_qvpVerticalLines.resize(qvdXValues.size());
 
-    for(uint32_t u32LineNo = 0; u32LineNo < (uint32_t)qvdXValues.size(); u32LineNo++)
+    for(uint32_t u32LineNo = 0; u32LineNo < (uint32_t)m_qvpVerticalLines.size(); u32LineNo++)
     {
-        delete m_qvpVerticalLines[u32LineNo];
-
-        if(u32LineNo < (uint32_t)qvqstrLabels.size())
-        {
-            m_qvpVerticalLines[u32LineNo] = new QwtPlotMarker(qvqstrLabels[u32LineNo]);
-            m_qvpVerticalLines[u32LineNo]->setLabel(QwtText(qvqstrLabels[u32LineNo]));
-        }
-        else
-        {
-            m_qvpVerticalLines[u32LineNo] = new QwtPlotMarker();
-        }
-
+        m_qvpVerticalLines[u32LineNo] = new QwtPlotMarker();
         m_qvpVerticalLines[u32LineNo]->setXValue(qvdXValues[u32LineNo]);
         m_qvpVerticalLines[u32LineNo]->setLinePen(QColor(Qt::cyan));
         m_qvpVerticalLines[u32LineNo]->setLineStyle(QwtPlotMarker::VLine);
         m_qvpVerticalLines[u32LineNo]->setLabelOrientation(Qt::Vertical);
         m_qvpVerticalLines[u32LineNo]->setLabelAlignment(Qt::AlignLeft);
-        m_qvpVerticalLines[u32LineNo]->attach(m_pUI->qwtPlot);
+        if(m_bShowVerticalLines)
+            m_qvpVerticalLines[u32LineNo]->attach(m_pUI->qwtPlot);
+    }
+}
+
+void cBasicQwtLinePlotWidget::slotDrawVerticalLines(QVector<double> qvdXValues, QVector<QString> qvqstrLabels)
+{
+    slotDrawVerticalLines(qvdXValues);
+
+    for(uint32_t u32LineNo = 0; u32LineNo < (uint32_t)qvqstrLabels.size(); u32LineNo++)
+    {
+        if((uint32_t)m_qvpVerticalLines.size() > u32LineNo)
+        {
+            m_qvpVerticalLines[u32LineNo]->setTitle(qvqstrLabels[u32LineNo]);
+            m_qvpVerticalLines[u32LineNo]->setLabel(qvqstrLabels[u32LineNo]);
+        }
+    }
+}
+
+void cBasicQwtLinePlotWidget::slotShowVerticalLines(bool bShow)
+{
+    m_bShowVerticalLines = bShow;
+
+    for(uint32_t u32LineNo = 0; u32LineNo < (uint32_t)m_qvpVerticalLines.size(); u32LineNo++)
+    {
+        m_qvpVerticalLines[u32LineNo]->detach();
+    }
+
+    if(m_bShowVerticalLines)
+    {
+        for(uint32_t u32LineNo = 0; u32LineNo < (uint32_t)m_qvpVerticalLines.size(); u32LineNo++)
+        {
+            m_qvpVerticalLines[u32LineNo]->attach(m_pUI->qwtPlot);
+        }
     }
 }

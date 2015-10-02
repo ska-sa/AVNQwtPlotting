@@ -36,6 +36,9 @@ public:
     explicit cFramedQwtLinePlotWidget(QWidget *pParent = 0);
     ~cFramedQwtLinePlotWidget();
 
+    void                                addData(const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us = 0);
+    void                                setXSpan(double dXBegin, double dXEnd);
+
     void                                showAveragingControl(bool bEnable);
 
 protected:
@@ -50,7 +53,13 @@ protected:
     //Controls
     uint32_t                            m_u32Averaging;
 
-    virtual void                        processYData(const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us);
+    //Span of X scale
+    double                              m_dXBegin;
+    double                              m_dXEnd;
+    bool                                m_bXSpanChanged;
+
+    virtual void                        processXData(const QVector<float> &qvfXData, int64_t i64Timestamp_us = 0);
+    virtual void                        processYData(const QVector<QVector<float> > &qvvfXData, int64_t i64Timestamp_us = 0);
 
 public slots:
     void                                slotSetAverage(int iAveraging);

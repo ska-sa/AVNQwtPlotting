@@ -22,6 +22,7 @@ typedef unsigned __int64 uint64_t;
 #include <QString>
 #include <QVector>
 #include <QReadWriteLock>
+#include <QFont>
 #include <qwt_plot_grid.h>
 #include <qwt_plot_curve.h>
 #include <qwt_plot_zoomer.h>
@@ -45,7 +46,7 @@ public:
     explicit cBasicQwtLinePlotWidget(QWidget *pParent = 0);
     ~cBasicQwtLinePlotWidget();
 
-    void                                addData(const QVector<QVector<float> > &qvvfData, int64_t i64Timestamp_us = 0);
+    void                                addData(const QVector<float> &qvfXData, const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us = 0);
 
     void                                setXLabel(const QString &qstrXLabel);
     void                                setXUnit(const QString &qstrXUnit);
@@ -67,8 +68,6 @@ public:
 
     void                                enableTimestampInTitle(bool bEnable);
 
-    void                                setXSpan(double dXBegin, double dXEnd);
-
     QVector<Qt::GlobalColor>            m_qveCurveColours;
 
 protected:
@@ -89,11 +88,6 @@ protected:
     QVector<QVector<double> >           m_qvvdYDataToPlot;
     QVector<double>                     m_qvdXDataToPlot;
 
-    //Span of X scale
-    double                              m_dXBegin;
-    double                              m_dXEnd;
-    bool                                m_bXSpanChanged;
-
     //Plot settings
     QString                             m_qstrTitle;
     QString                             m_qstrXLabel;
@@ -101,7 +95,12 @@ protected:
     QString                             m_qstrYLabel;
     QString                             m_qstrYUnit;
 
+    QFont                               m_oTitleFont;
+    QFont                               m_oXFont;
+    QFont                               m_oYFont;
+
     bool                                m_bIsGridShown;
+    bool                                m_bShowVerticalLines;
 
     //Controls
     bool                                m_bIsPaused;
@@ -121,8 +120,8 @@ protected:
 
     void                                showCurve(QwtPlotItem *pItem, bool bShow);
     void                                updateCurves();
-    virtual void                        processXData(uint32_t u32NPoint, int64_t i64Timestamp_us);
-    virtual void                        processYData(const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us);
+    virtual void                        processXData(const QVector<float> &qvfXData, int64_t i64Timestamp_us = 0);
+    virtual void                        processYData(const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us = 0);
 
     void                                insertWidgetIntoControlFrame(QWidget* pNewWidget, uint32_t u32Index, bool bAddSpacerAfter = false);
 
@@ -131,11 +130,13 @@ public slots:
     void                                slotPause(bool bPause);
     void                                slotEnableAutoscale(bool bEnable);
     void                                slotShowLegend(bool bEnable);
+    void                                slotDrawVerticalLines(QVector<double> qvdXValues);
     void                                slotDrawVerticalLines(QVector<double> qvdXValues, QVector<QString> qvqstrLabels);
+    void                                slotShowVerticalLines(bool bShow);
 
-private slots:
+protected slots:
     void                                slotUpdatePlotData(unsigned int uiCurveNo, QVector<double> qvdXData, QVector<double> qvdYData, int64_t i64Timestamp_us);
-    void                                slotUpdateScalesAndLabels();
+    virtual void                        slotUpdateScalesAndLabels();
     void                                slotUpdateXScaleBase(int iBase);
     void                                slotLegendChecked(const QVariant &oItemInfo, bool bChecked);
     void                                slotGrabFrame();

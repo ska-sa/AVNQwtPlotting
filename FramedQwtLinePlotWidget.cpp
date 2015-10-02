@@ -3,7 +3,6 @@
 #include <iostream>
 
 //Library includes
-#include<QSpacerItem>
 
 //Local includes
 #include "FramedQwtLinePlotWidget.h"
@@ -14,15 +13,18 @@ using namespace std;
 cFramedQwtLinePlotWidget::cFramedQwtLinePlotWidget(QWidget *pParent) :
     cBasicQwtLinePlotWidget(pParent),
     m_u32NextHistoryInputIndex(0),
-    m_u32Averaging(1)
+    m_u32Averaging(1),
+    m_dXBegin(0.0),
+    m_dXEnd(1.0),
+    m_bXSpanChanged(true)
 {
     //Add averaging control to GUI
     m_pAveragingLabel = new QLabel(QString("Averaging"), this);
     m_pAveragingSpinBox = new QSpinBox(this);
     m_pAveragingSpinBox->setMinimum(1);
     m_pAveragingSpinBox->setMaximum(50);
-    insertWidgetIntoControlFrame(m_pAveragingLabel, 5);
-    insertWidgetIntoControlFrame(m_pAveragingSpinBox, 6, true);
+    insertWidgetIntoControlFrame(m_pAveragingLabel, 3);
+    insertWidgetIntoControlFrame(m_pAveragingSpinBox, 4, true);
 
     slotSetAverage(1);
 
@@ -33,6 +35,38 @@ cFramedQwtLinePlotWidget::~cFramedQwtLinePlotWidget()
 {
 }
 
+void cFramedQwtLinePlotWidget::addData(const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us)
+{
+    //Pass the first channel of the Y data as the X array.
+    //Only the length information is needed to update the X scale.
+    cBasicQwtLinePlotWidget::addData(qvvfYData[0], qvvfYData, i64Timestamp_us);
+}
+
+void cFramedQwtLinePlotWidget::processXData(const QVector<float> &qvfXData, int64_t i64Timestamp_us)
+{
+    Q_UNUSED(i64Timestamp_us);
+
+    //Update X data
+    //Generate our own scale based on the span member values. Only use the size of passed array. Not the data.
+
+    m_oMutex.lockForRead(); //Ensure span doesn't change during this section
+
+    if((uint32_t)m_qvdXDataToPlot.size() != (uint32_t)qvfXData.size() || m_bXSpanChanged)
+    {
+        m_qvdXDataToPlot.resize(qvfXData.size());
+
+        double dInterval = (m_dXEnd - m_dXBegin) / (double)(m_qvdXDataToPlot.size() - 1);
+
+        for(uint32_t u32XTick = 0; u32XTick < (uint32_t)m_qvdXDataToPlot.size(); u32XTick++)
+        {
+            m_qvdXDataToPlot[u32XTick] = m_dXBegin + u32XTick * dInterval;
+        }
+
+        m_bXSpanChanged = false;
+    }
+
+    m_oMutex.unlock();
+}
 
 void cFramedQwtLinePlotWidget::processYData(const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us)
 {
@@ -116,6 +150,18 @@ void cFramedQwtLinePlotWidget::showAveragingControl(bool bEnable)
     m_pAveragingSpinBox->setVisible(bEnable);
     m_pAveragingLabel->setVisible(bEnable);
 }
+
+void cFramedQwtLinePlotWidget::setXSpan(double dXBegin, double dXEnd)
+{
+    QWriteLocker oWriteLock(&m_oMutex);
+
+    m_dXBegin = dXBegin;
+    m_dXEnd = dXEnd;
+
+    //Flag for ploting code to update
+    m_bXSpanChanged = true;
+}
+
 
 void cFramedQwtLinePlotWidget::slotSetAverage(int iAveraging)
 {
