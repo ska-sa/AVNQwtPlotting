@@ -8,8 +8,13 @@
 //Local includes
 #include "BasicQwtLinePlotDistancePicker.h"
 
+#if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
+cBasicQwtLinePlotDistancePicker::cBasicQwtLinePlotDistancePicker(int iXAxis, int iYAxis, RubberBand oRubberBand, DisplayMode oTrackerMode, QwtPlotCanvas *pCanvas) :
+    cBasicQwtLinePlotPositionPicker(iXAxis, iYAxis, oRubberBand, oTrackerMode, pCanvas)
+  #else
 cBasicQwtLinePlotDistancePicker::cBasicQwtLinePlotDistancePicker(int iXAxis, int iYAxis, RubberBand oRubberBand, DisplayMode oTrackerMode, QWidget *pCanvas) :
     cBasicQwtLinePlotPositionPicker(iXAxis, iYAxis, oRubberBand, oTrackerMode, pCanvas)
+  #endif
 {
     setStateMachine( new QwtPickerDragRectMachine );
     setRubberBandPen(QPen(Qt::cyan));

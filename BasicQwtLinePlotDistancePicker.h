@@ -14,7 +14,11 @@ class cBasicQwtLinePlotDistancePicker : public cBasicQwtLinePlotPositionPicker
 {
     Q_OBJECT
 public:
+#if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
+    explicit cBasicQwtLinePlotDistancePicker(int iXAxis, int iYAxis, RubberBand oRubberBand, DisplayMode oTrackerMode, QwtPlotCanvas* pCanvas);
+#else
     explicit cBasicQwtLinePlotDistancePicker(int iXAxis, int iYAxis, RubberBand oRubberBand, DisplayMode oTrackerMode, QWidget* pCanvas);
+#endif
 
 protected:
     virtual QwtText trackerTextF(const QPointF &oPosition) const;

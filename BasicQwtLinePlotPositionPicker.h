@@ -13,7 +13,11 @@ class cBasicQwtLinePlotPositionPicker : public QwtPlotPicker
 {
     Q_OBJECT
 public:
+#if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
+    explicit cBasicQwtLinePlotPositionPicker(int iXAxis, int iYAxis, RubberBand oRubberBand, DisplayMode oTrackerMode, QwtPlotCanvas* pCanvas);
+#else
     explicit cBasicQwtLinePlotPositionPicker(int iXAxis, int iYAxis, RubberBand oRubberBand, DisplayMode oTrackerMode, QWidget* pCanvas);
+#endif
 
     //Overload this function to return the tracker text with our units of choice
     virtual QwtText trackerTextF(const QPointF &oPosition) const;

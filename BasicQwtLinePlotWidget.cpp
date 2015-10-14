@@ -11,7 +11,11 @@
 #include <qwt_scale_engine.h>
 #include <qwt_picker.h>
 #include <qwt_legend.h>
+#if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
+#include <qwt_legend_item.h>
+#else
 #include <qwt_legend_label.h>
+#endif
 #include <qwt_plot_renderer.h>
 
 //Local includes
@@ -403,6 +407,38 @@ void cBasicQwtLinePlotWidget::slotShowLegend(bool bEnable)
     if(bEnable && m_qvpPlotCurves.size())
     {
         QwtLegend *pLegend = new QwtLegend;
+
+#if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
+        pLegend->setItemMode( QwtLegend::CheckableItem );
+
+        m_pUI->qwtPlot->insertLegend( pLegend, QwtPlot::RightLegend );
+
+        //Align widgets checked/unchecked with whether the plot item is visible
+        QwtPlotItemList plotItems = m_pUI->qwtPlot->itemList();
+
+        QList<QWidget *> legendWidgets = pLegend->legendItems();
+
+        for(uint32_t u32LegendEntryNo = 0; u32LegendEntryNo < (uint32_t)legendWidgets.size(); u32LegendEntryNo++)
+        {
+            QwtLegendItem *pLegendItem = qobject_cast<QwtLegendItem *>( legendWidgets[u32LegendEntryNo] );
+            if (pLegendItem)
+            {
+                //Manually match legend item to plot by title
+                for(uint32_t u32PlotNo = 0; u32PlotNo < (uint32_t)plotItems.size(); u32PlotNo++)
+                {
+                    if( !pLegendItem->text().text().compare(plotItems[u32PlotNo]->title().text()) )
+                    {
+                        pLegendItem->setChecked(plotItems[u32PlotNo]->isVisible());
+                        break;
+                    }
+
+                }
+            }
+        }
+
+        QObject::connect( m_pUI->qwtPlot, SIGNAL(legendChecked(QwtPlotItem*,bool)), this, SLOT( slotLegendChecked(QwtPlotItem*, bool) ) );
+
+#else
         pLegend->setDefaultItemMode( QwtLegendData::Checkable );
         m_pUI->qwtPlot->insertLegend( pLegend, QwtPlot::RightLegend );
 
@@ -421,7 +457,8 @@ void cBasicQwtLinePlotWidget::slotShowLegend(bool bEnable)
             }
         }
 
-        QObject::connect( pLegend, SIGNAL( checked( const QVariant &, bool, int ) ), SLOT( slotLegendChecked( const QVariant &, bool ) ) );
+        QObject::connect( pLegend, SIGNAL( checked( const QVariant &, bool, int ) ), this, SLOT( slotLegendChecked( const QVariant &, bool ) ) );
+#endif
     }
     else
     {
@@ -552,16 +589,36 @@ void cBasicQwtLinePlotWidget::slotGrabFrame()
     slotPause(true);
 
     QwtPlotRenderer oRenderer;
+
+#if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
+    oRenderer.renderDocument(m_pUI->qwtPlot, QString("%1").arg(m_pUI->qwtPlot->title().text()), QSizeF(297.0, 210.0), 300);
+#else
     oRenderer.exportTo(m_pUI->qwtPlot, QString("%1").arg(m_pUI->qwtPlot->title().text()), QSizeF(297.0, 210.0), 300);
+#endif
+
 
     slotPause(false);
 }
 
 void cBasicQwtLinePlotWidget::slotUpdateXScaleBase(int iBase)
 {
+#if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
+    Q_UNUSED(iBase);
+    //Setting base not supported in this version of Qtwt
+
+#else
     m_pUI->qwtPlot->axisScaleEngine(QwtPlot::xBottom)->setBase(iBase);
+#endif
 }
 
+#if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
+void cBasicQwtLinePlotWidget::slotLegendChecked(QwtPlotItem *pPlotItem, bool bChecked)
+{  
+    if(pPlotItem)
+        showCurve(pPlotItem, bChecked);
+}
+
+#else
 void cBasicQwtLinePlotWidget::slotLegendChecked(const QVariant &oItemInfo, bool bChecked)
 {
     QwtPlotItem *pPlotItem = m_pUI->qwtPlot->infoToItem(oItemInfo);
@@ -569,6 +626,7 @@ void cBasicQwtLinePlotWidget::slotLegendChecked(const QVariant &oItemInfo, bool 
     if(pPlotItem)
         showCurve(pPlotItem, bChecked);
 }
+#endif
 
 void  cBasicQwtLinePlotWidget::showCurve(QwtPlotItem *pItem, bool bShow)
 {
@@ -601,7 +659,11 @@ void cBasicQwtLinePlotWidget::updateCurves()
                 m_qvpPlotCurves.push_back(new QwtPlotCurve(QString("Channel %1").arg(u32ChannelNo)));
             }
             m_qvpPlotCurves[u32ChannelNo]->attach(m_pUI->qwtPlot);
+#if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
+            m_qvpPlotCurves[u32ChannelNo]->setPen(QPen(m_qveCurveColours[u32ChannelNo]));
+#else
             m_qvpPlotCurves[u32ChannelNo]->setPen(m_qveCurveColours[u32ChannelNo], 1.0, Qt::SolidLine);
+#endif
         }
     }
 }

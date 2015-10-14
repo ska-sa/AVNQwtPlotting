@@ -5,8 +5,14 @@
 //Local includes
 #include "BasicQwtLinePlotPositionPicker.h"
 
+#if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
+cBasicQwtLinePlotPositionPicker::cBasicQwtLinePlotPositionPicker(int iXAxis, int iYAxis, RubberBand oRubberBand, DisplayMode oTrackerMode, QwtPlotCanvas *pCanvas) :
+    QwtPlotPicker(iXAxis, iYAxis, oRubberBand, oTrackerMode, pCanvas)
+  #else
 cBasicQwtLinePlotPositionPicker::cBasicQwtLinePlotPositionPicker(int iXAxis, int iYAxis, RubberBand oRubberBand, DisplayMode oTrackerMode, QWidget *pCanvas) :
     QwtPlotPicker(iXAxis, iYAxis, oRubberBand, oTrackerMode, pCanvas)
+  #endif
+
 {
     setMousePattern( QwtEventPattern::MouseSelect1, Qt::NoButton);
 }

@@ -145,7 +145,11 @@ protected slots:
     void                                slotUpdatePlotData(unsigned int uiCurveNo, QVector<double> qvdXData, QVector<double> qvdYData, int64_t i64Timestamp_us);
     virtual void                        slotUpdateScalesAndLabels();
     void                                slotUpdateXScaleBase(int iBase);
+#if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
+    void                                slotLegendChecked(QwtPlotItem *pPlotItem, bool bChecked);
+#else
     void                                slotLegendChecked(const QVariant &oItemInfo, bool bChecked);
+#endif
     void                                slotGrabFrame();
 
 signals:
