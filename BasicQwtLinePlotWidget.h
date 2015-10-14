@@ -31,7 +31,8 @@ typedef unsigned __int64 uint64_t;
 #include <qwt_plot_marker.h>
 
 //Local includes
-#include "BasicQwtLinePlotPicker.h"
+#include "BasicQwtLinePlotPositionPicker.h"
+#include "BasicQwtLinePlotDistancePicker.h"
 
 namespace Ui {
 class cBasicQwtLinePlotWidget;
@@ -46,7 +47,8 @@ public:
     explicit cBasicQwtLinePlotWidget(QWidget *pParent = 0);
     ~cBasicQwtLinePlotWidget();
 
-    void                                addData(const QVector<float> &qvfXData, const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us = 0);
+    void                                addData(const QVector<float> &qvfXData, const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us = 0,
+                                                const QVector<uint32_t> &qvu32ChannelList = QVector<uint32_t>());
 
     void                                setXLabel(const QString &qstrXLabel);
     void                                setXUnit(const QString &qstrXUnit);
@@ -82,7 +84,8 @@ protected:
     QwtPlotZoomer*                      m_pPlotZoomer;
     QwtPlotPanner*                      m_pPlotPanner;
     QwtPlotMagnifier*                   m_pPlotMagnifier;
-    cBasicQwtLinePlotPicker*            m_pPlotPicker;
+    cBasicQwtLinePlotPositionPicker*    m_pPlotPositionPicker;
+    cBasicQwtLinePlotDistancePicker*    m_pPlotDistancePicker;
 
     //Data stuctures
     QVector<QVector<double> >           m_qvvdYDataToPlot;
@@ -120,8 +123,12 @@ protected:
 
     void                                showCurve(QwtPlotItem *pItem, bool bShow);
     void                                updateCurves();
+
     virtual void                        processXData(const QVector<float> &qvfXData, int64_t i64Timestamp_us = 0);
-    virtual void                        processYData(const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us = 0);
+    virtual void                        processYData(const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us = 0, const QVector<uint32_t> &qvu32ChannelList = QVector<uint32_t>());
+
+    virtual void                        logConversion();
+    virtual void                        powerLogConversion();
 
     void                                insertWidgetIntoControlFrame(QWidget* pNewWidget, uint32_t u32Index, bool bAddSpacerAfter = false);
 

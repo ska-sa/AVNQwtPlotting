@@ -52,12 +52,13 @@ cBasicQwtLinePlotWidget::cBasicQwtLinePlotWidget(QWidget *pParent) :
     m_oTitleFont.setPointSizeF(m_oTitleFont.pointSizeF() * 0.7);
 
     //Set up other plot controls
-    m_pPlotPicker = new cBasicQwtLinePlotPicker(QwtPlot::xBottom, QwtPlot::yLeft, QwtPicker::RectRubberBand, QwtPicker::AlwaysOn, m_pUI->qwtPlot->canvas());
-    m_pPlotPicker->setTrackerPen(QPen(Qt::white));
+    m_pPlotPositionPicker = new cBasicQwtLinePlotPositionPicker(QwtPlot::xBottom, QwtPlot::yLeft, QwtPicker::NoRubberBand, QwtPicker::AlwaysOn, m_pUI->qwtPlot->canvas());
+    m_pPlotPositionPicker->setTrackerPen(QPen(Qt::white));
+
+    m_pPlotDistancePicker = new cBasicQwtLinePlotDistancePicker(QwtPlot::xBottom, QwtPlot::yLeft, QwtPicker::RectRubberBand, QwtPicker::ActiveOnly, m_pUI->qwtPlot->canvas());
+    m_pPlotDistancePicker->setTrackerPen(QPen(Qt::white));
 
     m_pPlotZoomer = new QwtPlotZoomer(m_pUI->qwtPlot->canvas());
-    m_pPlotZoomer->setMousePattern(QwtEventPattern::MouseSelect2, Qt::RightButton, Qt::ControlModifier);
-    m_pPlotZoomer->setMousePattern(QwtEventPattern::MouseSelect3, Qt::RightButton);
     m_pPlotZoomer->setRubberBandPen(QPen(Qt::white));
     m_pPlotZoomer->setTrackerMode(QwtPicker::AlwaysOff); //Use our own picker.
 
@@ -125,7 +126,7 @@ void cBasicQwtLinePlotWidget::insertWidgetIntoControlFrame(QWidget* pNewWidget, 
 }
 
 
-void cBasicQwtLinePlotWidget::addData(const QVector<float> &qvfXData, const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us)
+void cBasicQwtLinePlotWidget::addData(const QVector<float> &qvfXData, const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us, const QVector<uint32_t> &qvu32ChannelList)
 {
     //Safety flag which can be set by other threads if data is known not to be interpretable
     if(m_bRejectData)
@@ -135,7 +136,7 @@ void cBasicQwtLinePlotWidget::addData(const QVector<float> &qvfXData, const QVec
     processXData(qvfXData, i64Timestamp_us);
 
     //Update Y data
-    processYData(qvvfYData, i64Timestamp_us);
+    processYData(qvvfYData, i64Timestamp_us, qvu32ChannelList);
 
     //Check if number of points to plot is base 2:
     double dExponent = log2(m_qvdXDataToPlot.size());
@@ -153,28 +154,20 @@ void cBasicQwtLinePlotWidget::addData(const QVector<float> &qvfXData, const QVec
     }
 
     //Do log conversions if required
-    for(uint32_t u32ChannelNo = 0; u32ChannelNo < (unsigned)m_qvvdYDataToPlot.size(); u32ChannelNo++)
+
+    m_oMutex.lockForRead(); //Ensure the 2 bool flags don't change during these operations
+
+    if(m_bDoLogConversion)
     {
-        m_oMutex.lockForRead(); //Ensure the 2 bool flags don't change during these operations
-
-        if(m_bDoLogConversion)
-        {
-            for(uint32_t u32SampleNo = 0; u32SampleNo <  (unsigned)m_qvvdYDataToPlot[u32ChannelNo].size(); u32SampleNo++)
-            {
-                m_qvvdYDataToPlot[u32ChannelNo][u32SampleNo] = 10 * log10(m_qvvdYDataToPlot[u32ChannelNo][u32SampleNo] + 0.001);
-            }
-        }
-
-        if(m_bDoPowerLogConversion)
-        {
-            for(uint32_t u32SampleNo = 0; u32SampleNo <  (unsigned)m_qvvdYDataToPlot[u32ChannelNo].size(); u32SampleNo++)
-            {
-                m_qvvdYDataToPlot[u32ChannelNo][u32SampleNo] = 20 * log10(m_qvvdYDataToPlot[u32ChannelNo][u32SampleNo]  + 0.001);
-            }
-        }
-
-        m_oMutex.unlock();
+        logConversion();
     }
+
+    if(m_bDoPowerLogConversion)
+    {
+        powerLogConversion();
+    }
+
+    m_oMutex.unlock();
 
     m_oMutex.lockForRead(); //Lock for pause flag
 
@@ -213,7 +206,7 @@ void cBasicQwtLinePlotWidget::processXData(const QVector<float> &qvfXData, int64
 }
 
 
-void cBasicQwtLinePlotWidget::processYData(const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us)
+void cBasicQwtLinePlotWidget::processYData(const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us, const QVector<uint32_t> &qvu32ChannelList)
 {
     //This function populates the m_qvvdYDataToPlot vector
     //In this basic implementation the input data is simply copied to the output array
@@ -227,15 +220,61 @@ void cBasicQwtLinePlotWidget::processYData(const QVector<QVector<float> > &qvvfY
         m_qvvdYDataToPlot.resize(qvvfYData.size());
     }
 
-    for(uint32_t u32ChannelNo = 0; u32ChannelNo < (uint32_t)qvvfYData.size(); u32ChannelNo++)
+    //If there is no channel list use all channels in the input vector
+    if(qvu32ChannelList.empty())
     {
-        //Update number of samples in each channel
-        m_qvvdYDataToPlot[u32ChannelNo].resize(qvvfYData[u32ChannelNo].size());
-
-        //Copy the input data to plot array
-        for(uint32_t u32SampleNo = 0; u32SampleNo < (uint32_t)qvvfYData[u32ChannelNo].size(); u32SampleNo++)
+        for(uint32_t u32ChannelNo = 0; u32ChannelNo < (uint32_t)qvvfYData.size(); u32ChannelNo++)
         {
-            m_qvvdYDataToPlot[u32ChannelNo][u32SampleNo] = qvvfYData[u32ChannelNo][u32SampleNo];
+            //Update number of samples in each channel
+            m_qvvdYDataToPlot[u32ChannelNo].resize(qvvfYData[u32ChannelNo].size());
+
+            //Copy the input data to plot array
+            for(uint32_t u32SampleNo = 0; u32SampleNo < (uint32_t)qvvfYData[u32ChannelNo].size(); u32SampleNo++)
+            {
+                m_qvvdYDataToPlot[u32ChannelNo][u32SampleNo] = qvvfYData[u32ChannelNo][u32SampleNo];
+            }
+        }
+    }
+    else //Otherwise use those specified in the list
+    {
+        for(uint32_t u32ChannelNo = 0; u32ChannelNo < (uint32_t)qvu32ChannelList.size(); u32ChannelNo++)
+        {
+            //Update number of samples in each channel
+            m_qvvdYDataToPlot[u32ChannelNo].resize(qvvfYData[qvu32ChannelList[u32ChannelNo]].size());
+
+            //Copy the input data to plot array
+            for(uint32_t u32SampleNo = 0; u32SampleNo < (uint32_t)qvvfYData[qvu32ChannelList[u32ChannelNo]].size(); u32SampleNo++)
+            {
+                m_qvvdYDataToPlot[u32ChannelNo][u32SampleNo] = qvvfYData[qvu32ChannelList[u32ChannelNo]][u32SampleNo];
+            }
+        }
+    }
+}
+
+void cBasicQwtLinePlotWidget::logConversion()
+{
+    //Assumes input values are already in power domain
+    //Simply do 10log10( )  for all values to get dB
+
+    for(uint32_t u32ChannelNo = 0; u32ChannelNo < (unsigned)m_qvvdYDataToPlot.size(); u32ChannelNo++)
+    {
+        for(uint32_t u32SampleNo = 0; u32SampleNo <  (unsigned)m_qvvdYDataToPlot[u32ChannelNo].size(); u32SampleNo++)
+        {
+            m_qvvdYDataToPlot[u32ChannelNo][u32SampleNo] = 10 * log10(m_qvvdYDataToPlot[u32ChannelNo][u32SampleNo] + 0.001);
+        }
+    }
+}
+
+void cBasicQwtLinePlotWidget::powerLogConversion()
+{
+    //Assumes input values are in voltage domain
+    //Simply do 10log10( )  for all values to get dB
+
+    for(uint32_t u32ChannelNo = 0; u32ChannelNo < (unsigned)m_qvvdYDataToPlot.size(); u32ChannelNo++)
+    {
+        for(uint32_t u32SampleNo = 0; u32SampleNo <  (unsigned)m_qvvdYDataToPlot[u32ChannelNo].size(); u32SampleNo++)
+        {
+            m_qvvdYDataToPlot[u32ChannelNo][u32SampleNo] = 20 * log10(m_qvvdYDataToPlot[u32ChannelNo][u32SampleNo]  + 0.001);
         }
     }
 }
@@ -492,8 +531,11 @@ void cBasicQwtLinePlotWidget::slotUpdateScalesAndLabels()
         m_pUI->qwtPlot->setAxisTitle(QwtPlot::yLeft, oYLabel);
     }
 
-    m_pPlotPicker->setXUnit(m_qstrXUnit);
-    m_pPlotPicker->setYUnit(m_qstrYUnit);
+    m_pPlotPositionPicker->setXUnit(m_qstrXUnit);
+    m_pPlotPositionPicker->setYUnit(m_qstrYUnit);
+
+    m_pPlotDistancePicker->setXUnit(m_qstrXUnit);
+    m_pPlotDistancePicker->setYUnit(m_qstrYUnit);
 
     QwtText oTitle(m_qstrTitle);
     oTitle.setFont(m_oTitleFont);

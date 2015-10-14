@@ -48,8 +48,13 @@ protected:
     double                              m_dSpanLengthScalingFactor;
     QString                             m_qstrSpanLengthSpinBoxUnitOveride;
 
+    double                              m_dLastLogConversionXIndex;
+
     virtual void                        processXData(const QVector<float> &qvfXData, int64_t i64Timestamp_us = 0);
-    virtual void                        processYData(const QVector<QVector<float> > &qvvfXData, int64_t i64Timestamp_us = 0);
+    virtual void                        processYData(const QVector<QVector<float> > &qvvfXData, int64_t i64Timestamp_us = 0, const QVector<uint32_t> &qvu32ChannelList = QVector<uint32_t>());
+
+    virtual void                        logConversion();
+    virtual void                        powerLogConversion();
 
 protected slots:
     virtual void                        slotUpdateScalesAndLabels();

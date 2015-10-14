@@ -57,14 +57,19 @@ public:
 
     //Add data should take an array containing the full selectable band as specified by the function below
     virtual void                        addData(const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us = 0);
+
     void                                setSelectableBand(double dBandMinimum, double dBandMaximum, uint32_t u32NDiscreteFrequencies, const QString &qstrUnit);
+    void                                setIntegrationTimeControlScalingFactor(double dScalingFactor_s, const QString &qstrNewUnit, double dMaxSpinBoxValue);
 
 protected:
     //GUI Widgets
-    QDoubleSpinBox                      *m_pBandStartDoubleSpinBox;
-    QDoubleSpinBox                      *m_pBandStopDoubleSpinBox;
     QLabel                              *m_pBandStartLabel;
     QLabel                              *m_pBandStopLabel;
+    QLabel                              *m_pIntegrationTimeLabel;
+
+    QDoubleSpinBox                      *m_pBandStartDoubleSpinBox;
+    QDoubleSpinBox                      *m_pBandStopDoubleSpinBox;
+    QDoubleSpinBox                      *m_pIntegrationTimeSpinBox;
 
     //Custom Scale drawer
     cTimeScaleDraw                      m_oTimeScaleDraw;
@@ -74,6 +79,9 @@ protected:
     double                              m_dBandMaximum;
     uint32_t                            m_u32NDiscreteBandFreqencies;
     QString                             m_qstrBandUnit;
+    double                              m_dIntegrationTimeScalingFactor_s;
+    double                              m_dMaxIntegrationTime;
+    QString                             m_qstrIntegrationTimeUnit;
 
     //Run time values
     double                              m_dSelectedBandStart;
@@ -83,6 +91,7 @@ protected:
     QVector<float>                     m_qvfIntergratedPowerTimestamp_s;
 
     int64_t                            m_i64IntegrationStartTime_us;
+    int64_t                            m_i64IntegrationTime_us;
     bool                               m_bNewIntegration;
 
 protected slots:
@@ -90,6 +99,8 @@ protected slots:
 
     void                                slotBandStartChanged(double dBandStart);
     void                                slotBandStopChanged(double dBandStop);
+
+    void                                slotIntegrationTimeChanged(double dIntegrationTime);
 
 public slots:
     void                                slotSetSelectedBandStart(double dBandStart);
