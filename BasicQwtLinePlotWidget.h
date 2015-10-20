@@ -33,6 +33,8 @@ typedef unsigned __int64 uint64_t;
 //Local includes
 #include "BasicQwtLinePlotPositionPicker.h"
 #include "BasicQwtLinePlotDistancePicker.h"
+#include "CursorCentredQwtPlotMagnifier.h"
+#include "AnimatedQwtPlotZoomer.h"
 
 namespace Ui {
 class cBasicQwtLinePlotWidget;
@@ -45,7 +47,7 @@ class cBasicQwtLinePlotWidget : public QWidget
 public:   
 
     explicit cBasicQwtLinePlotWidget(QWidget *pParent = 0);
-    ~cBasicQwtLinePlotWidget();
+    virtual ~cBasicQwtLinePlotWidget();
 
     void                                addData(const QVector<float> &qvfXData, const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us = 0,
                                                 const QVector<uint32_t> &qvu32ChannelList = QVector<uint32_t>());
@@ -81,9 +83,9 @@ protected:
 
     //Qwt Plot extensions
     QwtPlotGrid                         m_oPlotGrid;
-    QwtPlotZoomer*                      m_pPlotZoomer;
+    cAnimatedQwtPlotZoomer*             m_pPlotZoomer;
     QwtPlotPanner*                      m_pPlotPanner;
-    QwtPlotMagnifier*                   m_pPlotMagnifier;
+    cCursorCentredQwtPlotMagnifier*     m_pPlotMagnifier;
     cBasicQwtLinePlotPositionPicker*    m_pPlotPositionPicker;
     cBasicQwtLinePlotDistancePicker*    m_pPlotDistancePicker;
 

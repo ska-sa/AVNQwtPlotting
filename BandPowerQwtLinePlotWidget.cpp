@@ -19,6 +19,7 @@ cBandPowerQwtLinePlot::cBandPowerQwtLinePlot(QWidget *pParent) :
     m_pBandStartDoubleSpinBox(new QDoubleSpinBox(this)),
     m_pBandStopDoubleSpinBox(new QDoubleSpinBox(this)),
     m_pIntegrationTimeSpinBox(new QDoubleSpinBox(this)),
+    m_pTimeScaleDraw(new cTimeScaleDraw),
     m_dBandMinimum(0),
     m_dBandMaximum(1),
     m_dIntegrationTimeScalingFactor_s(1.0),
@@ -53,7 +54,7 @@ cBandPowerQwtLinePlot::cBandPowerQwtLinePlot(QWidget *pParent) :
 
     m_qvfIntergratedPowerTimestamp_s.resize(1);
 
-    m_pUI->qwtPlot->setAxisScaleDraw(QwtPlot::xBottom, &m_oTimeScaleDraw);
+    m_pUI->qwtPlot->setAxisScaleDraw(QwtPlot::xBottom, m_pTimeScaleDraw);
 }
 
 cBandPowerQwtLinePlot::~cBandPowerQwtLinePlot()

@@ -53,7 +53,7 @@ class cBandPowerQwtLinePlot: public cScrollingQwtLinePlotWidget
 public:   
 
     explicit cBandPowerQwtLinePlot(QWidget *pParent = 0);
-    ~cBandPowerQwtLinePlot();
+    virtual ~cBandPowerQwtLinePlot();
 
     //Add data should take an array containing the full selectable band as specified by the function below
     virtual void                        addData(const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us = 0);
@@ -72,7 +72,7 @@ protected:
     QDoubleSpinBox                      *m_pIntegrationTimeSpinBox;
 
     //Custom Scale drawer
-    cTimeScaleDraw                      m_oTimeScaleDraw;
+    cTimeScaleDraw                      *m_pTimeScaleDraw;
 
     //Settings
     double                              m_dBandMinimum;

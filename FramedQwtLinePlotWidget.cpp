@@ -23,6 +23,7 @@ cFramedQwtLinePlotWidget::cFramedQwtLinePlotWidget(QWidget *pParent) :
     m_pAveragingSpinBox = new QSpinBox(this);
     m_pAveragingSpinBox->setMinimum(1);
     m_pAveragingSpinBox->setMaximum(50);
+    m_pAveragingSpinBox->setKeyboardTracking(false);
     insertWidgetIntoControlFrame(m_pAveragingLabel, 3);
     insertWidgetIntoControlFrame(m_pAveragingSpinBox, 4, true);
 

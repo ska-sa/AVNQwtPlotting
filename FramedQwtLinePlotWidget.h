@@ -34,7 +34,7 @@ class cFramedQwtLinePlotWidget : public cBasicQwtLinePlotWidget
 public:   
 
     explicit cFramedQwtLinePlotWidget(QWidget *pParent = 0);
-    ~cFramedQwtLinePlotWidget();
+    virtual ~cFramedQwtLinePlotWidget();
 
     void                                addData(const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us = 0, const QVector<uint32_t> &qvu32ChannelList = QVector<uint32_t>());
 

@@ -33,7 +33,7 @@ class cScrollingQwtLinePlotWidget : public cBasicQwtLinePlotWidget
 public:   
 
     explicit cScrollingQwtLinePlotWidget(QWidget *pParent = 0);
-    ~cScrollingQwtLinePlotWidget();
+    virtual ~cScrollingQwtLinePlotWidget();
 
     void                                showSpanLengthControl(bool bEnable);
     void                                setSpanLengthControlScalingFactor(double dScalingFactor, const QString &qstrNewUnit);

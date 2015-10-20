@@ -62,15 +62,17 @@ cBasicQwtLinePlotWidget::cBasicQwtLinePlotWidget(QWidget *pParent) :
     m_pPlotDistancePicker = new cBasicQwtLinePlotDistancePicker(QwtPlot::xBottom, QwtPlot::yLeft, QwtPicker::RectRubberBand, QwtPicker::ActiveOnly, m_pUI->qwtPlot->canvas());
     m_pPlotDistancePicker->setTrackerPen(QPen(Qt::white));
 
-    m_pPlotZoomer = new QwtPlotZoomer(m_pUI->qwtPlot->canvas());
+    m_pPlotZoomer = new cAnimatedQwtPlotZoomer(m_pUI->qwtPlot->canvas());
     m_pPlotZoomer->setRubberBandPen(QPen(Qt::white));
     m_pPlotZoomer->setTrackerMode(QwtPicker::AlwaysOff); //Use our own picker.
+    m_pPlotZoomer->setMousePattern(QwtEventPattern::MouseSelect2, Qt::RightButton, Qt::ControlModifier);//Zoom out complete by Control + right mouse button
+    m_pPlotZoomer->setMousePattern(QwtEventPattern::MouseSelect3, Qt::RightButton);//Zoom out 1 step by right mouse button
 
     m_pPlotPanner = new QwtPlotPanner(m_pUI->qwtPlot->canvas());
     m_pPlotPanner->setAxisEnabled(QwtPlot::yRight, false);
     m_pPlotPanner->setMouseButton(Qt::MidButton);
 
-    m_pPlotMagnifier = new QwtPlotMagnifier(m_pUI->qwtPlot->canvas());
+    m_pPlotMagnifier = new cCursorCentredQwtPlotMagnifier(m_pUI->qwtPlot->canvas());
     m_pPlotMagnifier->setAxisEnabled(QwtPlot::yRight, false);
     m_pPlotMagnifier->setMouseButton(Qt::NoButton);
     m_pPlotMagnifier->setWheelFactor(1.1);
@@ -390,14 +392,21 @@ void cBasicQwtLinePlotWidget::slotEnableAutoscale(bool bEnable)
         QwtInterval oAutoscaledYRange = m_pUI->qwtPlot->axisInterval(QwtPlot::yLeft);
 
         oZoomBase.setTop(oAutoscaledYRange.maxValue());
-        oZoomBase.setBottom(oAutoscaledYRange.maxValue());
+        oZoomBase.setBottom(oAutoscaledYRange.minValue());
 
-        m_pPlotZoomer->setZoomBase(oZoomBase);
+        m_pUI->qwtPlot->setAxisAutoScale(QwtPlot::yLeft, bEnable);
+
+        m_pPlotZoomer->setZoomBase(oZoomBase); //Set the zoom base y interval to that specified by the autoscale
+
+        m_pUI->qwtPlot->setAxisScale(QwtPlot::yLeft, oAutoscaledYRange.minValue(), oAutoscaledYRange.maxValue());
+
+    }
+    else
+    {
+        m_pUI->qwtPlot->setAxisAutoScale(QwtPlot::yLeft, bEnable);
     }
 
     m_bIsAutoscaleEnabled = bEnable;
-
-    m_pUI->qwtPlot->setAxisAutoScale(QwtPlot::yLeft, m_bIsAutoscaleEnabled);
 
     cout << "cBasicQwtLinePlotWidget::slotEnableAutoscale() Autoscale for plot \"" << m_qstrTitle.toStdString() << "\" set to " << m_bIsAutoscaleEnabled << endl;
 }
