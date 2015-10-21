@@ -58,7 +58,7 @@ public:
     //Add data should take an array containing the full selectable band as specified by the function below
     virtual void                        addData(const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us = 0);
 
-    void                                setSelectableBand(double dBandMinimum, double dBandMaximum, uint32_t u32NDiscreteFrequencies, const QString &qstrUnit);
+    void                                setSelectableBand(double dBandMinimum, double dBandMaximum, const QString &qstrUnit);
     void                                setIntegrationTimeControlScalingFactor(double dScalingFactor_s, const QString &qstrNewUnit, double dMaxSpinBoxValue);
 
 protected:
@@ -77,7 +77,6 @@ protected:
     //Settings
     double                              m_dBandMinimum;
     double                              m_dBandMaximum;
-    uint32_t                            m_u32NDiscreteBandFreqencies;
     QString                             m_qstrBandUnit;
     double                              m_dIntegrationTimeScalingFactor_s;
     double                              m_dMaxIntegrationTime;
@@ -103,6 +102,7 @@ protected slots:
     void                                slotIntegrationTimeChanged(double dIntegrationTime);
 
 public slots:
+    //These change only the spin box value and do not emit subsequent signals
     void                                slotSetSelectedBandStart(double dBandStart);
     void                                slotSetSelectedBandStop(double dBandStop);
     void                                slotSetSelectedBand(double dBandStart, double dBandStop);

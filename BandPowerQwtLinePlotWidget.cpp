@@ -128,13 +128,12 @@ void cBandPowerQwtLinePlot::addData(const QVector<QVector<float> > &qvvfYData, i
     }
 }
 
-void cBandPowerQwtLinePlot::setSelectableBand(double dBandMinimum, double dBandMaximum, uint32_t u32NDiscreteFrequencies, const QString &qstrUnit)
+void cBandPowerQwtLinePlot::setSelectableBand(double dBandMinimum, double dBandMaximum, const QString &qstrUnit)
 {
     m_oMutex.lockForWrite();
 
     m_dBandMinimum= dBandMinimum;
     m_dBandMaximum = dBandMaximum;
-    m_u32NDiscreteBandFreqencies = u32NDiscreteFrequencies;
     m_qstrBandUnit = qstrUnit;
 
     m_oMutex.unlock();
@@ -166,18 +165,21 @@ void  cBandPowerQwtLinePlot::slotUpdateScalesAndLabels()
 
     m_pBandStartDoubleSpinBox->setMinimum(m_dBandMinimum);
     m_pBandStartDoubleSpinBox->setMaximum(m_dBandMaximum);
-    m_pBandStartDoubleSpinBox->setSingleStep( (m_dBandMaximum - m_dBandMinimum) / (m_u32NDiscreteBandFreqencies - 1) );
     m_pBandStartDoubleSpinBox->setSuffix(QString(" %1").arg(m_qstrBandUnit));
 
     m_pBandStopDoubleSpinBox->setMinimum(m_dBandMinimum);
     m_pBandStopDoubleSpinBox->setMaximum(m_dBandMaximum);
-    m_pBandStopDoubleSpinBox->setSingleStep( (m_dBandMaximum - m_dBandMinimum) / (m_u32NDiscreteBandFreqencies - 1) );
     m_pBandStopDoubleSpinBox->setSuffix(QString(" %1").arg(m_qstrBandUnit));
 
     m_pIntegrationTimeSpinBox->setSuffix(m_qstrIntegrationTimeUnit);
     m_pIntegrationTimeSpinBox->setMaximum(m_dMaxIntegrationTime);
 
     m_oMutex.unlock();
+
+    //Note: outside mutex to prevent recursive lock.
+    //This is just a convenient initial state of setting initial selected band to maximum span so not functionaly critical.
+    m_pBandStartDoubleSpinBox->setValue(m_dBandMinimum);
+    m_pBandStopDoubleSpinBox->setValue(m_dBandMaximum);
 }
 
 void cBandPowerQwtLinePlot::slotBandStartChanged(double dBandStart)
@@ -258,3 +260,4 @@ void cBandPowerQwtLinePlot::slotSetSelectedBand(double dBandStart, double dBandS
     slotSetSelectedBandStart(dBandStart);
     slotSetSelectedBandStop(dBandStop);
 }
+
