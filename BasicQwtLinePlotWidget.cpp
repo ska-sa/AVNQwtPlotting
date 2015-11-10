@@ -389,17 +389,15 @@ void cBasicQwtLinePlotWidget::slotEnableAutoscale(bool bEnable)
     if(m_bIsAutoscaleEnabled && !bEnable)
     {
         QRectF oZoomBase = m_pPlotZoomer->zoomBase();
-        QwtInterval oAutoscaledYRange = m_pUI->qwtPlot->axisInterval(QwtPlot::yLeft);
+        m_oAutoscaledYRange = m_pUI->qwtPlot->axisInterval(QwtPlot::yLeft);
 
-        oZoomBase.setTop(oAutoscaledYRange.maxValue());
-        oZoomBase.setBottom(oAutoscaledYRange.minValue());
+        oZoomBase.setTop(m_oAutoscaledYRange.maxValue());
+        oZoomBase.setBottom(m_oAutoscaledYRange.minValue());
 
-        m_pUI->qwtPlot->setAxisAutoScale(QwtPlot::yLeft, bEnable);
+        m_pUI->qwtPlot->setAxisAutoScale(QwtPlot::yLeft, false);
 
         m_pPlotZoomer->setZoomBase(oZoomBase); //Set the zoom base y interval to that specified by the autoscale
-
-        m_pUI->qwtPlot->setAxisScale(QwtPlot::yLeft, oAutoscaledYRange.minValue(), oAutoscaledYRange.maxValue());
-
+        m_pUI->qwtPlot->setAxisScale(QwtPlot::yLeft, m_oAutoscaledYRange.minValue(), m_oAutoscaledYRange.maxValue());
     }
     else
     {
@@ -512,6 +510,8 @@ void cBasicQwtLinePlotWidget::enableRejectData(bool bEnable)
 
 void cBasicQwtLinePlotWidget::slotUpdatePlotData(unsigned int uiCurveNo, QVector<double> qvdXData, QVector<double> qvdYData, int64_t i64Timestamp_us)
 {
+
+
     //This function sends data to the actually plot widget in the GUI thread. This is necessary as draw the curve (i.e. updating the GUI) must be done in the GUI thread.
     //Connections to this slot should be queued if from signals not orginating from the GUI thread.
 
@@ -649,6 +649,8 @@ void cBasicQwtLinePlotWidget::updateCurves()
     //Make sure that there is a curve for each channel
     if(m_qvpPlotCurves.size() != m_qvvdYDataToPlot.size())
     {
+        cout << "cBasicQwtLinePlotWidget::updateCurves() Updating to " << m_qvvdYDataToPlot.size() << " plot curves for plot " << m_qstrTitle.toStdString() << endl;
+
         //If not, delete existing curves
         for(uint32_t u32ChannelNo = 0; u32ChannelNo < (unsigned)m_qvpPlotCurves.size(); u32ChannelNo++)
         {

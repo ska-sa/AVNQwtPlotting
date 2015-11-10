@@ -88,6 +88,11 @@ void cAnimatedQwtPlotZoomer::cAnimatedQwtPlotZoomer::rescale()
 
     if(m_bAnimate && m_bAnimationEnabled)
     {
+        {
+            QWriteLocker oLock(&m_oMutex);
+            m_bCurrenlyAnimating = true;
+        }
+
         //Generate a sequence of zoom frames with a timer
         m_u32AnimationFrameCount = 0;
         m_oFrameTimer.start(1000.0 / FPS);
@@ -127,6 +132,9 @@ void cAnimatedQwtPlotZoomer::slotGenerateAnimationFrame()
         //Stop the timer and go to the final zoom target
         m_oFrameTimer.stop();
         setAxisScales(m_dZoomTargetX1, m_dZoomTargetX2, m_dZoomTargetY1, m_dZoomTargetY2);
+
+        QWriteLocker oLock(&m_oMutex);
+        m_bCurrenlyAnimating = false;
     }
     else
     {
@@ -168,4 +176,11 @@ void cAnimatedQwtPlotZoomer::widgetMouseReleaseEvent( QMouseEvent *pEvent)
     QwtPlotZoomer::widgetMouseReleaseEvent(pEvent);
 
     m_bAnimate = false;
+}
+
+bool cAnimatedQwtPlotZoomer::isCurrentlyAnimating()
+{
+    QReadLocker oLock(&m_oMutex);
+
+    return m_bCurrenlyAnimating;
 }

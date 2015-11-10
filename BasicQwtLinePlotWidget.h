@@ -29,6 +29,7 @@ typedef unsigned __int64 uint64_t;
 #include <qwt_plot_panner.h>
 #include <qwt_plot_magnifier.h>
 #include <qwt_plot_marker.h>
+#include <qwt_interval.h>
 
 //Local includes
 #include "BasicQwtLinePlotPositionPicker.h"
@@ -110,6 +111,7 @@ protected:
     //Controls
     bool                                m_bIsPaused;
     bool                                m_bIsAutoscaleEnabled;
+    QwtInterval                         m_oAutoscaledYRange;
     uint32_t                            m_u32Averaging;
 
     bool                                m_bTimestampInTitleEnabled;
@@ -144,7 +146,7 @@ public slots:
     void                                slotShowVerticalLines(bool bShow);
 
 protected slots:
-    void                                slotUpdatePlotData(unsigned int uiCurveNo, QVector<double> qvdXData, QVector<double> qvdYData, int64_t i64Timestamp_us);
+    virtual void                        slotUpdatePlotData(unsigned int uiCurveNo, QVector<double> qvdXData, QVector<double> qvdYData, int64_t i64Timestamp_us);
     virtual void                        slotUpdateScalesAndLabels();
     void                                slotUpdateXScaleBase(int iBase);
 #if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions

@@ -15,6 +15,7 @@
 //Library includes
 #include <QTimer>
 #include <qwt_plot_zoomer.h>
+#include <QReadWriteLock>
 
 //Local includes
 
@@ -30,6 +31,8 @@ public:
 
     void                    setAnimationEnabled(bool bEnableAnimation);
     bool                    isAnimationEnabled();
+
+    bool                    isCurrentlyAnimating();
 
 protected:
     const static uint32_t   FPS = 30;
@@ -53,6 +56,10 @@ protected:
 
     bool                    m_bAnimate;
     bool                    m_bAnimationEnabled;
+
+    bool                    m_bCurrenlyAnimating;
+
+    QReadWriteLock          m_oMutex;
 
 signals:
 

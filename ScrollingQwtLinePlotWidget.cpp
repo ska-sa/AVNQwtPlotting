@@ -7,6 +7,8 @@
 
 //Local includes
 #include "ScrollingQwtLinePlotWidget.h"
+#include "ui_BasicQwtLinePlotWidget.h"
+#include "AVNUtilLibs/Timestamp/Timestamp.h"
 
 using namespace std;
 
@@ -146,7 +148,6 @@ void cScrollingQwtLinePlotWidget::powerLogConversion()
         {
             if(m_qvdXDataToPlot[u32SampleNo] >= m_dLastLogConversionXIndex)
             {
-                cout << "Breaking at " << u32SampleNo << endl;
                 break;
             }
         }
@@ -193,4 +194,66 @@ void cScrollingQwtLinePlotWidget::slotUpdateScalesAndLabels()
         m_pSpanLengthDoubleSpinBox->setSuffix(QString(" %1").arg(m_qstrSpanLengthSpinBoxUnitOveride));
     else
         m_pSpanLengthDoubleSpinBox->setSuffix(QString(" %1").arg(m_qstrXUnit));
+}
+
+void cScrollingQwtLinePlotWidget::slotUpdatePlotData(unsigned int uiCurveNo, QVector<double> qvdXData, QVector<double> qvdYData, int64_t i64Timestamp_us)
+{
+    //Given that X axis is sliding we need a special implementation here
+
+    //This function sends data to the actually plot widget in the GUI thread. This is necessary as draw the curve (i.e. updating the GUI) must be done in the GUI thread.
+    //Connections to this slot should be queued if from signals not orginating from the GUI thread.
+
+    //cout << "cBasicQwtLinePlotWidget::slotUpdatePlotData() Thread is: " << QThread::currentThread() << endl;
+
+    if(uiCurveNo >= (unsigned int)m_qvpPlotCurves.size())
+    {
+        cout << "cBasicQwtLinePlotWidget::slotUpdatePlotData(): Warning: Requested plotting for curve index "
+             << uiCurveNo << " which is out of range [0, " << m_qvpPlotCurves.size() - 1 << "]. Ignoring." << endl;
+
+        return;
+    }
+
+    m_qvpPlotCurves[uiCurveNo]->setSamples(qvdXData, qvdYData);
+
+    if(!m_pPlotZoomer->isCurrentlyAnimating())
+    {
+        //Update horizontal scale
+        QRectF oZoomBase = m_pPlotZoomer->zoomBase();
+        QwtInterval oAxisCurrent = m_pUI->qwtPlot->axisInterval(QwtPlot::xBottom);
+
+        double dShift = qvdXData.last() - oZoomBase.right();
+
+        //Ratios of the current X axis scale edges to the overall zoombase length
+        double dRatio1 = (oAxisCurrent.minValue() - oZoomBase.left()) / oZoomBase.width();
+        double dRatio2 = (oAxisCurrent.maxValue() - oZoomBase.left()) / oZoomBase.width();
+
+        oZoomBase.setLeft(qvdXData.first() );
+        oZoomBase.setRight(qvdXData.last() );
+
+        if( qvdXData.first() > (oAxisCurrent.maxValue() + dShift) || qvdXData.last() < (oAxisCurrent.minValue() + dShift) || !m_pPlotZoomer->zoomRectIndex())
+        {
+            //If the new data doesn't lie at all in they current scale then reset to show all data
+            //Also do this if we are not zoom at all
+            m_pUI->qwtPlot->setAxisScale(QwtPlot::xBottom, oZoomBase.left(), oZoomBase.right());
+        }
+        else
+        {
+            //Otherwise shift the scale proportionally to the the length of X added by the new data to zoom base.
+            //Proportional to the current zoom that is.
+
+            double dMin = oZoomBase.left() + oZoomBase.width() * dRatio1;
+            double dMax = oZoomBase.left() + oZoomBase.width() * dRatio2;
+
+            m_pUI->qwtPlot->setAxisScale(QwtPlot::xBottom, dMin, dMax);
+        }
+    }
+
+    //Update timestamp in Title if needed
+    if(m_bTimestampInTitleEnabled)
+    {
+        m_pUI->qwtPlot->setTitle( QString("%1 - %2").arg(m_qstrTitle).arg(AVN::stringFromTimestamp_full(i64Timestamp_us).c_str()) );
+    }
+
+    if(m_bIsAutoscaleEnabled)
+        m_pUI->qwtPlot->setAxisAutoScale(QwtPlot::yLeft, true);
 }
