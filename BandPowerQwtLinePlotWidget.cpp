@@ -161,7 +161,6 @@ void  cBandPowerQwtLinePlot::slotUpdateScalesAndLabels()
     cScrollingQwtLinePlotWidget::slotUpdateScalesAndLabels();
 
     //With additional functionality:
-    m_oMutex.lockForWrite();
 
     m_pBandStartDoubleSpinBox->setMinimum(m_dBandMinimum);
     m_pBandStartDoubleSpinBox->setMaximum(m_dBandMaximum);
@@ -173,8 +172,6 @@ void  cBandPowerQwtLinePlot::slotUpdateScalesAndLabels()
 
     m_pIntegrationTimeSpinBox->setSuffix(m_qstrIntegrationTimeUnit);
     m_pIntegrationTimeSpinBox->setMaximum(m_dMaxIntegrationTime);
-
-    m_oMutex.unlock();
 
     //Note: outside mutex to prevent recursive lock.
     //This is just a convenient initial state of setting initial selected band to maximum span so not functionaly critical.
