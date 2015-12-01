@@ -65,7 +65,7 @@ bool cAnimatedQwtPlotZoomer::isAnimationEnabled()
     return m_bAnimationEnabled;
 }
 
-void cAnimatedQwtPlotZoomer::cAnimatedQwtPlotZoomer::rescale()
+void cAnimatedQwtPlotZoomer::rescale()
 {
     //Largely derived from orginal Qwt code
     //The new scale is just progressively drawn

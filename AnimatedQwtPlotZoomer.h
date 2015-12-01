@@ -36,7 +36,7 @@ public:
 
 protected:
     const static uint32_t   FPS = 30;
-    u_int32_t               m_u32AnimationDuration_ms;
+    uint32_t                m_u32AnimationDuration_ms;
     uint32_t                m_u32NAnimationFrames;
     uint32_t                m_u32AnimationFrameCount;
 

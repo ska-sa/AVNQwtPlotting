@@ -3,7 +3,9 @@
 #include <cmath>
 
 //Library includes
+#ifndef Q_MOC_RUN //Qt's MOC and Boost have some issues don't let MOC process boost headers
 #include <boost/math/special_functions/trunc.hpp>
+#endif
 
 //Local includes
 #include "BandPowerQwtLinePlotWidget.h"
