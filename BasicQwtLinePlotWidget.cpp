@@ -60,6 +60,7 @@ cBasicQwtLinePlotWidget::cBasicQwtLinePlotWidget(QWidget *pParent) :
     m_pPlotPositionPicker->setTrackerPen(QPen(Qt::white));
 
     m_pPlotDistancePicker = new cBasicQwtLinePlotDistancePicker(QwtPlot::xBottom, QwtPlot::yLeft, QwtPicker::RectRubberBand, QwtPicker::ActiveOnly, m_pUI->qwtPlot->canvas());
+    m_pPlotDistancePicker->setMousePattern(QwtEventPattern::MouseSelect1, Qt::LeftButton, Qt::ControlModifier);
     m_pPlotDistancePicker->setTrackerPen(QPen(Qt::white));
 
     m_pPlotZoomer = new cAnimatedQwtPlotZoomer(m_pUI->qwtPlot->canvas());
