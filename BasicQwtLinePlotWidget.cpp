@@ -565,7 +565,7 @@ void cBasicQwtLinePlotWidget::slotUpdateScalesAndLabels()
 
     if(m_qstrYUnit.length())
     {
-        QwtText oYLabel( QString("%1 [%2]").arg(m_qstrYLabel).arg(m_qstrYUnit) );
+        QwtText oYLabel( QString("%1\n[%2]").arg(m_qstrYLabel).arg(m_qstrYUnit) );
         oYLabel.setFont(m_oYFont);
 
         m_pUI->qwtPlot->setAxisTitle(QwtPlot::yLeft, oYLabel);
