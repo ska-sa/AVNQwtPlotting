@@ -24,8 +24,13 @@ class cAnimatedQwtPlotZoomer : public QwtPlotZoomer
     Q_OBJECT
 public:
 
+#if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
+    explicit cAnimatedQwtPlotZoomer(QwtPlotCanvas *pCanvas, bool bDoReplot = true, bool bEnableAnimation = true, uint32_t u32AnimationDuration_ms = 800);
+    explicit cAnimatedQwtPlotZoomer(int iXAxis, int iYAxis, QwtPlotCanvas *pCanvas, bool bDoReplot = true, bool bEnableAnimation = true, uint32_t u32AnimationDuration_ms = 800);
+#else
     explicit cAnimatedQwtPlotZoomer(QWidget *pCanvas, bool bDoReplot = true, bool bEnableAnimation = true, uint32_t u32AnimationDuration_ms = 800);
     explicit cAnimatedQwtPlotZoomer(int iXAxis, int iYAxis, QWidget *pCanvas, bool bDoReplot = true, bool bEnableAnimation = true, uint32_t u32AnimationDuration_ms = 800);
+#endif
 
     void                    setAnimationDuration(uint32_t u32AnimationDuration_ms);
 

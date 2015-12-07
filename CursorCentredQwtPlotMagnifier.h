@@ -15,7 +15,12 @@ class cCursorCentredQwtPlotMagnifier : public QwtPlotMagnifier
 {
     Q_OBJECT
 public:
+#if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
+    explicit cCursorCentredQwtPlotMagnifier(QwtPlotCanvas* pCanvas);
+#else
     explicit cCursorCentredQwtPlotMagnifier(QWidget* pCanvas);
+#endif
+
 
 protected:
     virtual void    widgetWheelEvent(QWheelEvent *pWheelEvent);

@@ -10,8 +10,13 @@
 //Local includes
 #include "CursorCentredQwtPlotMagnifier.h"
 
+#if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
+cCursorCentredQwtPlotMagnifier::cCursorCentredQwtPlotMagnifier(QwtPlotCanvas* pCanvas) :
+    QwtPlotMagnifier(pCanvas)
+  #else
 cCursorCentredQwtPlotMagnifier::cCursorCentredQwtPlotMagnifier(QWidget* pCanvas) :
     QwtPlotMagnifier(pCanvas)
+  #endif
 {
 }
 

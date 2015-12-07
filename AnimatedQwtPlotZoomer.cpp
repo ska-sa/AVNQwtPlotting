@@ -12,7 +12,11 @@
 
 using namespace std;
 
+#if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
+cAnimatedQwtPlotZoomer::cAnimatedQwtPlotZoomer( QwtPlotCanvas *pCanvas, bool bDoReplot, bool bEnableAnimation, uint32_t u32AnimationDuration_ms) :
+    #else
 cAnimatedQwtPlotZoomer::cAnimatedQwtPlotZoomer( QWidget *pCanvas, bool bDoReplot, bool bEnableAnimation, uint32_t u32AnimationDuration_ms) :
+    #endif
     QwtPlotZoomer(pCanvas, bDoReplot),
     m_u32NAnimationFrames(1),
     m_u32AnimationFrameCount(0),
@@ -29,7 +33,11 @@ cAnimatedQwtPlotZoomer::cAnimatedQwtPlotZoomer( QWidget *pCanvas, bool bDoReplot
     QObject::connect( &m_oFrameTimer, SIGNAL(timeout()), this, SLOT(slotGenerateAnimationFrame()) );
 }
 
+#if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
+cAnimatedQwtPlotZoomer::cAnimatedQwtPlotZoomer(int iXAxis, int iYAxis, QwtPlotCanvas *pCanvas, bool bDoReplot, bool bEnableAnimation, uint32_t u32AnimationDuration_ms) :
+    #else
 cAnimatedQwtPlotZoomer::cAnimatedQwtPlotZoomer(int iXAxis, int iYAxis, QWidget *pCanvas, bool bDoReplot, bool bEnableAnimation, uint32_t u32AnimationDuration_ms) :
+    #endif
     QwtPlotZoomer(iXAxis, iYAxis, pCanvas, bDoReplot),
     m_u32NAnimationFrames(1),
     m_u32AnimationFrameCount(0),
@@ -77,13 +85,23 @@ void cAnimatedQwtPlotZoomer::rescale()
     {
         m_dZoomTargetX1 = rect.left();
         m_dZoomTargetX2 = rect.right();
+        m_dZoomTargetY1 = rect.top();
+        m_dZoomTargetY2 = rect.bottom();
+
+#if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
+
+        if ( ! ( m_pPlot->axisScaleDiv( xAxis() )->lowerBound() <= m_pPlot->axisScaleDiv( xAxis() )->upperBound() ) )
+            qSwap( m_dZoomTargetX1, m_dZoomTargetX2 );
+
+        if ( ! ( m_pPlot->axisScaleDiv( yAxis() )->lowerBound() <= m_pPlot->axisScaleDiv( yAxis() )->upperBound() ) )
+            qSwap( m_dZoomTargetY1, m_dZoomTargetY2 );
+#else
         if ( !m_pPlot->axisScaleDiv( xAxis() ).isIncreasing() )
             qSwap( m_dZoomTargetX1, m_dZoomTargetX2 );
 
-        m_dZoomTargetY1 = rect.top();
-        m_dZoomTargetY2 = rect.bottom();
         if ( !m_pPlot->axisScaleDiv( yAxis() ).isIncreasing() )
             qSwap( m_dZoomTargetY1, m_dZoomTargetY2 );
+#endif
     }
 
     if(m_bAnimate && m_bAnimationEnabled)
