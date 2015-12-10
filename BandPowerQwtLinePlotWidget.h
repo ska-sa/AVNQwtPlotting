@@ -23,28 +23,10 @@ typedef unsigned __int64 uint64_t;
 //Library includes
 #include <QSpinBox>
 #include <QLabel>
-#include <qwt_scale_draw.h>
 
 //Local includes
 #include "ScrollingQwtLinePlotWidget.h"
-#include "../../AVNUtilLibs/Timestamp/Timestamp.h"
-
-//A derived Qwt class to draw custom time labels on the QwtPlot X axis
-class cTimeScaleDraw : public QwtScaleDraw
-{
-public:
-    cTimeScaleDraw()
-    {
-    }
-
-    virtual QwtText label(double dValue_s) const
-    {
-        //The supplied value is whole seconds elapsed today
-        //Print a HH:mm:ss label
-
-        return QwtText( QString(AVN::stringFromTimestamp_HHmmss((int64_t)(dValue_s * 1e6)).c_str()) );
-    }
-};
+#include "WallTimeQwtScaleDraw.h"
 
 class cBandPowerQwtLinePlot: public cScrollingQwtLinePlotWidget
 {
@@ -72,7 +54,7 @@ protected:
     QDoubleSpinBox                      *m_pIntegrationTimeSpinBox;
 
     //Custom Scale drawer
-    cTimeScaleDraw                      *m_pTimeScaleDraw;
+    cWallTimeQwtScaleDraw               *m_pTimeScaleDraw;
 
     //Settings
     double                              m_dBandMinimum;

@@ -9,7 +9,6 @@
 #include <QPrintDialog>
 #include <QDebug>
 #include <qwt_scale_engine.h>
-#include <qwt_picker.h>
 #include <qwt_legend.h>
 #if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
 #include <qwt_legend_item.h>
@@ -20,49 +19,22 @@
 
 //Local includes
 #include "BasicQwtLinePlotWidget.h"
-#include "ui_BasicQwtLinePlotWidget.h"
+#include "ui_QwtPlotWidgetBase.h"
 #include "AVNUtilLibs/Timestamp/Timestamp.h"
 
 using namespace std;
 
 cBasicQwtLinePlotWidget::cBasicQwtLinePlotWidget(QWidget *pParent) :
-    QWidget(pParent),
-    m_pUI(new Ui::cBasicQwtLinePlotWidget),
+    cQwtPlotWidgetBase(pParent),
     m_bIsGridShown(true),
-    m_bShowVerticalLines(true),
-    m_bIsPaused(false),
-    m_bIsAutoscaleEnabled(false),
-    m_u32Averaging(1),
-    m_bTimestampInTitleEnabled(true),
-    m_bDoLogConversion(false),
-    m_bDoPowerLogConversion(false),
-    m_bRejectData(true)
+    m_bShowVerticalLines(true)
 {
-    m_pUI->setupUi(this);
-
     //Black background canvas and grid lines by default
     //The background colour is not currently changable. A mutator can be added as necessary
     m_pUI->qwtPlot->setCanvasBackground(QBrush(QColor(Qt::black)));
     showPlotGrid(true);
 
-    //Make the axis and title font a little bit smaller
-    m_oYFont = m_pUI->qwtPlot->axisTitle(QwtPlot::yLeft).font();
-    m_oYFont.setPointSizeF(m_oYFont.pointSizeF() * 0.75);
-
-    m_oXFont = m_pUI->qwtPlot->axisTitle(QwtPlot::xBottom).font();
-    m_oXFont.setPointSizeF(m_oXFont.pointSizeF() * 0.75);
-
-    m_oTitleFont = m_pUI->qwtPlot->titleLabel()->font();
-    m_oTitleFont.setPointSizeF(m_oTitleFont.pointSizeF() * 0.7);
-
     //Set up other plot controls
-    m_pPlotPositionPicker = new cBasicQwtLinePlotPositionPicker(QwtPlot::xBottom, QwtPlot::yLeft, QwtPicker::NoRubberBand, QwtPicker::AlwaysOn, m_pUI->qwtPlot->canvas());
-    m_pPlotPositionPicker->setTrackerPen(QPen(Qt::white));
-
-    m_pPlotDistancePicker = new cBasicQwtLinePlotDistancePicker(QwtPlot::xBottom, QwtPlot::yLeft, QwtPicker::RectRubberBand, QwtPicker::ActiveOnly, m_pUI->qwtPlot->canvas());
-    m_pPlotDistancePicker->setMousePattern(QwtEventPattern::MouseSelect1, Qt::LeftButton, Qt::ControlModifier);
-    m_pPlotDistancePicker->setTrackerPen(QPen(Qt::white));
-
     m_pPlotZoomer = new cAnimatedQwtPlotZoomer(m_pUI->qwtPlot->canvas());
     m_pPlotZoomer->setRubberBandPen(QPen(Qt::white));
     m_pPlotZoomer->setTrackerMode(QwtPicker::AlwaysOff); //Use our own picker.
@@ -78,8 +50,6 @@ cBasicQwtLinePlotWidget::cBasicQwtLinePlotWidget(QWidget *pParent) :
     m_pPlotMagnifier->setMouseButton(Qt::NoButton);
     m_pPlotMagnifier->setWheelFactor(1.1);
 
-    m_pUI->qwtPlot->setAutoReplot(true);
-
     //Create colours for the plot curves
     m_qveCurveColours.push_back(Qt::red);
     m_qveCurveColours.push_back(Qt::green);
@@ -90,7 +60,21 @@ cBasicQwtLinePlotWidget::cBasicQwtLinePlotWidget(QWidget *pParent) :
     m_qveCurveColours.push_back(Qt::darkBlue);
     m_qveCurveColours.push_back(Qt::darkYellow);
 
-    connectSignalsToSlots();
+    //Addition control
+    m_pCheckBox_showLegend = new QCheckBox(QString("Show legend"), this);
+    insertWidgetIntoControlFrame(m_pCheckBox_showLegend, 3, true);
+
+    QObject::connect(m_pCheckBox_showLegend, SIGNAL(clicked(bool)), this, SLOT(slotShowLegend(bool)));
+
+    //Connections to update plot data as well as labels and scales are forced to be queued as the actual drawing of the widget needs to be done in the GUI thread
+    //This allows an update request to come from an arbirary thread to get executed by the GUI thread
+    qRegisterMetaType<QVector<double> >("QVector<double>");
+    qRegisterMetaType<int64_t>("int64_t");
+    QObject::connect(this, SIGNAL(sigUpdatePlotData(unsigned int,QVector<double>,QVector<double>,int64_t)),
+                     this, SLOT(slotUpdatePlotData(unsigned int,QVector<double>,QVector<double>,int64_t)), Qt::QueuedConnection);
+
+    //Metatypes used elsewhere:
+    qRegisterMetaType<QList<QwtLegendData> >("QList<QwtLegendData>");
 }
 
 cBasicQwtLinePlotWidget::~cBasicQwtLinePlotWidget()
@@ -102,36 +86,6 @@ cBasicQwtLinePlotWidget::~cBasicQwtLinePlotWidget()
 
     delete m_pUI;
 }
-
-void cBasicQwtLinePlotWidget::connectSignalsToSlots()
-{
-    QObject::connect(m_pUI->pushButton_pauseResume, SIGNAL(clicked()), this, SLOT(slotPauseResume()));
-    QObject::connect(m_pUI->checkBox_autoscale, SIGNAL(clicked(bool)), this, SLOT(slotEnableAutoscale(bool)));
-    QObject::connect(m_pUI->checkBox_showLegend, SIGNAL(clicked(bool)), this, SLOT(slotShowLegend(bool)));
-    QObject::connect(m_pUI->pushButton_grabFrame, SIGNAL(clicked()), this, SLOT(slotGrabFrame()) );
-
-    //Connections to update plot data as well as labels and scales are forced to be queued as the actual drawing of the widget needs to be done in the GUI thread
-    //This allows an update request to come from an arbirary thread to get executed by the GUI thread
-    qRegisterMetaType<QVector<double> >("QVector<double>");
-    qRegisterMetaType<int64_t>("int64_t");
-    QObject::connect(this, SIGNAL(sigUpdatePlotData(unsigned int,QVector<double>,QVector<double>,int64_t)),
-                     this, SLOT(slotUpdatePlotData(unsigned int,QVector<double>,QVector<double>,int64_t)), Qt::QueuedConnection);
-
-    QObject::connect(this, SIGNAL(sigUpdateScalesAndLabels()), this, SLOT(slotUpdateScalesAndLabels()), Qt::QueuedConnection);
-    QObject::connect(this, SIGNAL(sigUpdateXScaleBase(int)), this, SLOT(slotUpdateXScaleBase(int)), Qt::QueuedConnection);
-}
-
-void cBasicQwtLinePlotWidget::insertWidgetIntoControlFrame(QWidget* pNewWidget, uint32_t u32Index, bool bAddSpacerAfter)
-{
-    QHBoxLayout* pLayout = qobject_cast<QHBoxLayout*>(m_pUI->frame_controls->layout());
-
-    //Add the new widget
-    pLayout->insertWidget(u32Index, pNewWidget);
-
-    if(bAddSpacerAfter)
-        pLayout->insertSpacerItem(u32Index + 1, new QSpacerItem(20, 20, QSizePolicy::Fixed, QSizePolicy::Fixed));
-}
-
 
 void cBasicQwtLinePlotWidget::addData(const QVector<float> &qvfXData, const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us, const QVector<uint32_t> &qvu32ChannelList)
 {
@@ -145,20 +99,8 @@ void cBasicQwtLinePlotWidget::addData(const QVector<float> &qvfXData, const QVec
     //Update Y data
     processYData(qvvfYData, i64Timestamp_us, qvu32ChannelList);
 
-    //Check if number of points to plot is base 2:
-    double dExponent = log2(m_qvdXDataToPlot.size());
-    double dIntegerPart; //Unused
-
-    if(modf(dExponent, &dIntegerPart) == 0.0)
-    {
-        sigUpdateXScaleBase(2);
-        //Plot grid lines along base 2 numbers
-    }
-    else
-    {
-        sigUpdateXScaleBase(10);
-        //Otherwise plot grid lines along base 10 numbers
-    }
+    //Check if number of points to plot is 2 a power of 2 and set the X ticks to base 2 if so
+    autoUpdateXScaleBase( m_qvdXDataToPlot.size() );
 
     //Do log conversions if required
 
@@ -286,41 +228,6 @@ void cBasicQwtLinePlotWidget::powerLogConversion()
     }
 }
 
-void cBasicQwtLinePlotWidget::setXLabel(const QString &qstrXLabel)
-{
-    m_qstrXLabel = qstrXLabel;
-
-    sigUpdateScalesAndLabels();
-}
-
-void cBasicQwtLinePlotWidget::setXUnit(const QString &qstrXUnit)
-{
-    m_qstrXUnit = qstrXUnit;
-
-    sigUpdateScalesAndLabels();
-}
-
-void cBasicQwtLinePlotWidget::setYLabel(const QString &qstrYLabel)
-{
-    m_qstrYLabel = qstrYLabel;
-
-    sigUpdateScalesAndLabels();
-}
-
-void cBasicQwtLinePlotWidget::setYUnit(const QString &qstrYUnit)
-{
-    m_qstrYUnit = qstrYUnit;
-
-    sigUpdateScalesAndLabels();
-}
-
-void cBasicQwtLinePlotWidget::setTitle(const QString &qstrTitle)
-{
-    m_qstrTitle = qstrTitle;
-
-    sigUpdateScalesAndLabels();
-}
-
 void cBasicQwtLinePlotWidget::setCurveNames(const QVector<QString> &qvqstrCurveNames)
 {
     m_qvqstrCurveNames = qvqstrCurveNames;
@@ -350,39 +257,6 @@ void cBasicQwtLinePlotWidget::showPlotGrid(bool bEnable)
     }
 }
 
-void cBasicQwtLinePlotWidget::showAutoscaleControl(bool bEnable)
-{
-    m_pUI->checkBox_autoscale->setVisible(bEnable);
-}
-
-void cBasicQwtLinePlotWidget::showPauseControl(bool bEnable)
-{
-
-    m_pUI->pushButton_pauseResume->setVisible(bEnable);
-}
-
-void cBasicQwtLinePlotWidget::showLegendControl(bool bEnable)
-{
-    m_pUI->checkBox_showLegend->setVisible(bEnable);
-}
-
-void cBasicQwtLinePlotWidget::slotPauseResume()
-{
-    slotPause(!m_bIsPaused);
-}
-
-void cBasicQwtLinePlotWidget::slotPause(bool bPause)
-{
-    QWriteLocker oWriteLock(&m_oMutex);
-
-    m_bIsPaused = bPause;
-
-    if(m_bIsPaused)
-        m_pUI->pushButton_pauseResume->setText(QString("Resume"));
-    else
-        m_pUI->pushButton_pauseResume->setText(QString("Pause"));
-}
-
 void cBasicQwtLinePlotWidget::slotEnableAutoscale(bool bEnable)
 {
     //If autoscale is being disabled set the zoom base the current Y zoom
@@ -390,15 +264,15 @@ void cBasicQwtLinePlotWidget::slotEnableAutoscale(bool bEnable)
     if(m_bIsAutoscaleEnabled && !bEnable)
     {
         QRectF oZoomBase = m_pPlotZoomer->zoomBase();
-        m_oAutoscaledYRange = m_pUI->qwtPlot->axisInterval(QwtPlot::yLeft);
+        m_oAutoscaledRange = m_pUI->qwtPlot->axisInterval(QwtPlot::yLeft);
 
-        oZoomBase.setTop(m_oAutoscaledYRange.maxValue());
-        oZoomBase.setBottom(m_oAutoscaledYRange.minValue());
+        oZoomBase.setTop(m_oAutoscaledRange.maxValue());
+        oZoomBase.setBottom(m_oAutoscaledRange.minValue());
 
         m_pUI->qwtPlot->setAxisAutoScale(QwtPlot::yLeft, false);
 
         m_pPlotZoomer->setZoomBase(oZoomBase); //Set the zoom base y interval to that specified by the autoscale
-        m_pUI->qwtPlot->setAxisScale(QwtPlot::yLeft, m_oAutoscaledYRange.minValue(), m_oAutoscaledYRange.maxValue());
+        m_pUI->qwtPlot->setAxisScale(QwtPlot::yLeft, m_oAutoscaledRange.minValue(), m_oAutoscaledRange.maxValue());
     }
     else
     {
@@ -474,45 +348,8 @@ void cBasicQwtLinePlotWidget::slotShowLegend(bool bEnable)
     }
 }
 
-void cBasicQwtLinePlotWidget::enableTimestampInTitle(bool bEnable)
-{
-    m_bTimestampInTitleEnabled = bEnable;
-
-    if(!m_bTimestampInTitleEnabled)
-        m_pUI->qwtPlot->setTitle(m_qstrTitle);
-}
-
-void cBasicQwtLinePlotWidget::enableLogConversion(bool bEnable)
-{
-    QWriteLocker oWriteLock(&m_oMutex);
-
-    m_bDoLogConversion = bEnable;
-
-    if(m_bDoLogConversion)
-        m_bDoPowerLogConversion = false;
-}
-
-void cBasicQwtLinePlotWidget::enablePowerLogConversion(bool bEnable)
-{
-    QWriteLocker oWriteLock(&m_oMutex);
-
-    m_bDoPowerLogConversion = bEnable;
-
-    if(m_bDoPowerLogConversion)
-        m_bDoLogConversion = false;
-}
-
-void cBasicQwtLinePlotWidget::enableRejectData(bool bEnable)
-{
-    QWriteLocker oWriteLock(&m_oMutex);
-
-    m_bRejectData = bEnable;
-}
-
 void cBasicQwtLinePlotWidget::slotUpdatePlotData(unsigned int uiCurveNo, QVector<double> qvdXData, QVector<double> qvdYData, int64_t i64Timestamp_us)
 {
-
-
     //This function sends data to the actually plot widget in the GUI thread. This is necessary as draw the curve (i.e. updating the GUI) must be done in the GUI thread.
     //Connections to this slot should be queued if from signals not orginating from the GUI thread.
 
@@ -548,45 +385,7 @@ void cBasicQwtLinePlotWidget::slotUpdatePlotData(unsigned int uiCurveNo, QVector
 
 void cBasicQwtLinePlotWidget::slotUpdateScalesAndLabels()
 {
-    if(m_qstrXUnit.length())
-    {
-        QwtText oXLabel(QwtText(QString("%1 [%2]").arg(m_qstrXLabel).arg(m_qstrXUnit)) );
-        oXLabel.setFont(m_oXFont);
-
-        m_pUI->qwtPlot->setAxisTitle(QwtPlot::xBottom, oXLabel);
-    }
-    else
-    {
-        QwtText oXLabel( QwtText(QString("%1").arg(m_qstrXLabel)) );
-        oXLabel.setFont(m_oXFont);
-
-        m_pUI->qwtPlot->setAxisTitle(QwtPlot::xBottom, oXLabel);
-    }
-
-    if(m_qstrYUnit.length())
-    {
-        QwtText oYLabel( QString("%1\n[%2]").arg(m_qstrYLabel).arg(m_qstrYUnit) );
-        oYLabel.setFont(m_oYFont);
-
-        m_pUI->qwtPlot->setAxisTitle(QwtPlot::yLeft, oYLabel);
-    }
-    else
-    {
-        QwtText oYLabel( QString("%1").arg(m_qstrYLabel) );
-        oYLabel.setFont(m_oYFont);
-
-        m_pUI->qwtPlot->setAxisTitle(QwtPlot::yLeft, oYLabel);
-    }
-
-    m_pPlotPositionPicker->setXUnit(m_qstrXUnit);
-    m_pPlotPositionPicker->setYUnit(m_qstrYUnit);
-
-    m_pPlotDistancePicker->setXUnit(m_qstrXUnit);
-    m_pPlotDistancePicker->setYUnit(m_qstrYUnit);
-
-    QwtText oTitle(m_qstrTitle);
-    oTitle.setFont(m_oTitleFont);
-    m_pUI->qwtPlot->setTitle(oTitle);
+    cQwtPlotWidgetBase::slotUpdateScalesAndLabels();
 
     for(uint32_t u32CurveNo = 0; u32CurveNo < (uint32_t)m_qvpPlotCurves.size() && u32CurveNo < (uint32_t)m_qvqstrCurveNames.size(); u32CurveNo++)
     {
@@ -594,32 +393,6 @@ void cBasicQwtLinePlotWidget::slotUpdateScalesAndLabels()
     }
 }
 
-void cBasicQwtLinePlotWidget::slotGrabFrame()
-{
-    slotPause(true);
-
-    QwtPlotRenderer oRenderer;
-
-#if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
-    oRenderer.renderDocument(m_pUI->qwtPlot, QString("%1").arg(m_pUI->qwtPlot->title().text()), QSizeF(297.0, 210.0), 300);
-#else
-    oRenderer.exportTo(m_pUI->qwtPlot, QString("%1").arg(m_pUI->qwtPlot->title().text()), QSizeF(297.0, 210.0), 300);
-#endif
-
-
-    slotPause(false);
-}
-
-void cBasicQwtLinePlotWidget::slotUpdateXScaleBase(int iBase)
-{
-#if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
-    Q_UNUSED(iBase);
-    //Setting base not supported in this version of Qtwt
-
-#else
-    m_pUI->qwtPlot->axisScaleEngine(QwtPlot::xBottom)->setBase(iBase);
-#endif
-}
 
 #if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
 void cBasicQwtLinePlotWidget::slotLegendChecked(QwtPlotItem *pPlotItem, bool bChecked)

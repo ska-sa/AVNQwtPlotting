@@ -3,10 +3,11 @@
 #include <iostream>
 
 //Library includes
+#include <qwt_scale_widget.h>
 
 //Local includes
 #include "FramedQwtLinePlotWidget.h"
-#include "ui_BasicQwtLinePlotWidget.h"
+#include "ui_QwtPlotWidgetBase.h"
 
 using namespace std;
 
@@ -27,9 +28,20 @@ cFramedQwtLinePlotWidget::cFramedQwtLinePlotWidget(QWidget *pParent) :
     insertWidgetIntoControlFrame(m_pAveragingLabel, 3);
     insertWidgetIntoControlFrame(m_pAveragingSpinBox, 4, true);
 
+    //Add waterfall menu
+    m_pWaterfallMenu = new QMenu(this);
+    m_pWaterfallMenuButton = new QToolButton(this);
+    m_pWaterfallMenuButton->setText(QString("Waterfall Plots"));
+    m_pWaterfallMenuButton->setMenu(m_pWaterfallMenu);
+    m_pWaterfallMenuButton->setPopupMode(QToolButton::InstantPopup);
+    insertWidgetIntoControlFrame(m_pWaterfallMenuButton, 6, true);
+
     slotSetAverage(1);
 
     QObject::connect(m_pAveragingSpinBox, SIGNAL(valueChanged(int)), this, SLOT(slotSetAverage(int)));
+    QObject::connect(m_pWaterfallMenu, SIGNAL(triggered(QAction*)), this, SLOT(slotWaterFallPlotEnabled(QAction*)));
+
+    QObject::connect(m_pUI->qwtPlot->axisWidget(QwtPlot::xBottom), SIGNAL(scaleDivChanged ()), this, SLOT(slotUpdateWaterPlotXScale()));
 }
 
 cFramedQwtLinePlotWidget::~cFramedQwtLinePlotWidget()
@@ -41,6 +53,16 @@ void cFramedQwtLinePlotWidget::addData(const QVector<QVector<float> > &qvvfYData
     //Pass the first channel of the Y data as the X array.
     //Only the length information is needed to update the X scale.
     cBasicQwtLinePlotWidget::addData(qvvfYData[0], qvvfYData, i64Timestamp_us, qvu32ChannelList);
+
+    {
+        QReadLocker oLock(&m_oWaterfallPlotMutex);
+
+        //Also pass data to any existing waterfall plots
+        for(uint32_t ui = 0; ui < (uint32_t)m_qvpWaterfallPlots.size(); ui++)
+        {
+            m_qvpWaterfallPlots[ui]->addData(qvvfYData[m_qvpWaterfallPlots[ui]->getChannelNo()], i64Timestamp_us);
+        }
+    }
 }
 
 void cFramedQwtLinePlotWidget::processXData(const QVector<float> &qvfXData, int64_t i64Timestamp_us)
@@ -236,6 +258,16 @@ void cFramedQwtLinePlotWidget::setXSpan(double dXBegin, double dXEnd)
     m_dXBegin = dXBegin;
     m_dXEnd = dXEnd;
 
+    {
+        QReadLocker oLock(&m_oWaterfallPlotMutex);
+
+        for(uint32_t ui = 0; ui < (uint32_t)m_qvpWaterfallPlots.size(); ui++)
+        {
+            cout << "Setting waterfall plot " << m_qvpWaterfallPlots[ui]->getChannelName().toStdString() << "X span to " << m_dXBegin << ", " << m_dXEnd << endl;
+            m_qvpWaterfallPlots[ui]->setXRange(m_dXBegin, m_dXEnd);
+        }
+    }
+
     //Flag for ploting code to update
     m_bXSpanChanged = true;
 }
@@ -246,4 +278,127 @@ void cFramedQwtLinePlotWidget::slotSetAverage(int iAveraging)
     QWriteLocker oWriteLock(&m_oMutex);
 
     m_u32Averaging = iAveraging;
+}
+
+void cFramedQwtLinePlotWidget::updateCurves()
+{
+    //Do what the base function does
+    cBasicQwtLinePlotWidget::updateCurves();
+
+    //But also populated the waterfall menu with the correct number of curves.
+    if(m_pWaterfallMenu->actions().size() != m_qvvdYDataToPlot.size())
+    {
+        cout << "cFramedQwtLinePlotWidget::updateCurves() Updating to " << m_qvvdYDataToPlot.size() << " plot menu entries for waterfall plot " << m_qstrTitle.toStdString() << endl;
+
+        //If not, delete menu entries
+        m_pWaterfallMenu->clear();
+
+        //Create new entries
+        for(unsigned int u32ChannelNo = 0; u32ChannelNo < (unsigned)m_qvvdYDataToPlot.size(); u32ChannelNo++)
+        {
+            cIndexedCheckableQAction *pAction;
+            if(u32ChannelNo < (uint32_t)m_qvqstrCurveNames.size())
+            {
+                pAction = new cIndexedCheckableQAction(u32ChannelNo, m_qvqstrCurveNames[u32ChannelNo], this);
+            }
+            else
+            {
+                pAction = new cIndexedCheckableQAction(u32ChannelNo, QString("Channel %1").arg(u32ChannelNo), this);
+            }
+
+            m_pWaterfallMenu->addAction(pAction);
+        }
+    }
+}
+
+void cFramedQwtLinePlotWidget::slotWaterFallPlotEnabled(QAction* pAction)
+{
+    if(pAction->isChecked())
+    {
+        cIndexedCheckableQAction *pIndexAbleAction = qobject_cast<cIndexedCheckableQAction*>(pAction);
+
+        if(pIndexAbleAction)
+        {
+            cout << "Creating new waterfall plot for curve " << pAction->text().toStdString() << endl;
+            addWaterfallPlot(pIndexAbleAction->getIndex(), pAction->text());
+        }
+    }
+    else
+    {
+        cout << "Removing waterfall plot for curve " << pAction->text().toStdString() << endl;
+        removeWaterfallPlot(pAction->text());
+    }
+}
+
+void cFramedQwtLinePlotWidget::addWaterfallPlot(uint32_t u32ChannelNo, const QString &qstrChannelName)
+{
+    cWaterfallQwtPlotWidget *pWaterfallPlot = new cWaterfallQwtPlotWidget(u32ChannelNo, qstrChannelName, this);
+
+    {
+        QWriteLocker oLock(&m_oWaterfallPlotMutex);
+        m_qvpWaterfallPlots.push_back(pWaterfallPlot);
+        m_pUI->verticalLayout->insertWidget(0, pWaterfallPlot);
+    }
+
+    {
+        QReadLocker oLock(&m_oWaterfallPlotMutex);
+        cout << "Setting waterfall plot " << pWaterfallPlot->getChannelName().toStdString() << "X span to " << m_dXBegin << ", " << m_dXEnd << endl;
+        pWaterfallPlot->setXRange(m_dXBegin, m_dXEnd);
+        pWaterfallPlot->setXLabel(m_qstrXLabel);
+        pWaterfallPlot->setXUnit(m_qstrXUnit);
+        pWaterfallPlot->setYLabel(QString("Timestamp"));
+        pWaterfallPlot->setYScaleIsTime(true);
+        pWaterfallPlot->setZLabel(m_qstrYLabel);
+        pWaterfallPlot->setZUnit(m_qstrYUnit);
+        pWaterfallPlot->setTitle(qstrChannelName);
+    }
+
+    slotUpdateWaterPlotXScale();
+}
+
+void cFramedQwtLinePlotWidget::removeWaterfallPlot(const QString &qstrChannelName)
+{
+    QWriteLocker oLock(&m_oWaterfallPlotMutex);
+
+    for(uint32_t ui = 0; ui < (uint32_t)m_qvpWaterfallPlots.size();)
+    {
+        if(m_qvpWaterfallPlots[ui]->getChannelName() == qstrChannelName)
+        {
+            //m_pUI->verticalLayout->removeWidget(m_qvpWaterfallPlots[ui]);
+            delete m_qvpWaterfallPlots[ui];
+            m_qvpWaterfallPlots.erase(m_qvpWaterfallPlots.begin() + ui);
+
+            cout << "cFramedQwtLinePlotWidget::removeWaterfallPlot()): Deleted waterfall plot for curve: " << qstrChannelName.toStdString() << endl;
+        }
+        else
+        {
+            ui++;
+        }
+    }
+}
+
+void cFramedQwtLinePlotWidget::slotUpdateWaterPlotXScale()
+{
+    QReadLocker oLock(&m_oWaterfallPlotMutex);
+
+    for(uint32_t ui = 0; ui < (uint32_t)m_qvpWaterfallPlots.size(); ui++)
+    {
+        m_qvpWaterfallPlots[ui]->slotSetXSpan(m_pUI->qwtPlot->axisInterval(QwtPlot::xBottom).minValue(), m_pUI->qwtPlot->axisInterval(QwtPlot::xBottom).maxValue());
+    }
+}
+
+void cFramedQwtLinePlotWidget::slotUpdateScalesAndLabels()
+{
+    cBasicQwtLinePlotWidget::slotUpdateScalesAndLabels();
+
+    QReadLocker oLock(&m_oWaterfallPlotMutex);
+
+    //Check that all waterfall axes labels and units are up to date
+    for(uint32_t ui = 0; ui < (uint32_t)m_qvpWaterfallPlots.size(); ui++)
+    {
+        m_qvpWaterfallPlots[ui]->setXLabel(m_qstrXLabel);
+        m_qvpWaterfallPlots[ui]->setXUnit(m_qstrXUnit);
+        m_qvpWaterfallPlots[ui]->setZLabel(m_qstrYLabel);
+        m_qvpWaterfallPlots[ui]->setZUnit(m_qstrYUnit);
+    }
 }

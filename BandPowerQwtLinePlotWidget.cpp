@@ -9,7 +9,7 @@
 
 //Local includes
 #include "BandPowerQwtLinePlotWidget.h"
-#include "ui_BasicQwtLinePlotWidget.h"
+#include "ui_QwtPlotWidgetBase.h"
 
 using namespace std;
 
@@ -21,7 +21,7 @@ cBandPowerQwtLinePlot::cBandPowerQwtLinePlot(QWidget *pParent) :
     m_pBandStartDoubleSpinBox(new QDoubleSpinBox(this)),
     m_pBandStopDoubleSpinBox(new QDoubleSpinBox(this)),
     m_pIntegrationTimeSpinBox(new QDoubleSpinBox(this)),
-    m_pTimeScaleDraw(new cTimeScaleDraw),
+    m_pTimeScaleDraw(new cWallTimeQwtScaleDraw),
     m_dBandMinimum(0),
     m_dBandMaximum(1),
     m_dIntegrationTimeScalingFactor_s(1.0),
@@ -57,6 +57,8 @@ cBandPowerQwtLinePlot::cBandPowerQwtLinePlot(QWidget *pParent) :
     m_qvfIntergratedPowerTimestamp_s.resize(1);
 
     m_pUI->qwtPlot->setAxisScaleDraw(QwtPlot::xBottom, m_pTimeScaleDraw);
+
+    setXScaleIsTime(true); //Always true for this plot
 }
 
 cBandPowerQwtLinePlot::~cBandPowerQwtLinePlot()

@@ -7,7 +7,7 @@
 
 //Local includes
 #include "ScrollingQwtLinePlotWidget.h"
-#include "ui_BasicQwtLinePlotWidget.h"
+#include "ui_QwtPlotWidgetBase.h"
 #include "AVNUtilLibs/Timestamp/Timestamp.h"
 
 using namespace std;

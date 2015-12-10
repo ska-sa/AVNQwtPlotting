@@ -1,5 +1,5 @@
-#ifndef BASIC_QWT_LINE_PLOT_POSITION_PICKER_H
-#define BASIC_QWT_LINE_PLOT_POSITION_PICKER_H
+#ifndef QWT_PLOT_POSITION_PICKER_H
+#define QWT_PLOT_POSITION_PICKER_H
 
 //System includes
 
@@ -9,14 +9,14 @@
 
 //Local includes
 
-class cBasicQwtLinePlotPositionPicker : public QwtPlotPicker
+class cQwtPlotPositionPicker : public QwtPlotPicker
 {
     Q_OBJECT
 public:
 #if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
-    explicit cBasicQwtLinePlotPositionPicker(int iXAxis, int iYAxis, RubberBand oRubberBand, DisplayMode oTrackerMode, QwtPlotCanvas* pCanvas);
+    explicit cQwtPlotPositionPicker(int iXAxis, int iYAxis, RubberBand oRubberBand, DisplayMode oTrackerMode, QwtPlotCanvas* pCanvas);
 #else
-    explicit cBasicQwtLinePlotPositionPicker(int iXAxis, int iYAxis, RubberBand oRubberBand, DisplayMode oTrackerMode, QWidget* pCanvas);
+    explicit cQwtPlotPositionPicker(int iXAxis, int iYAxis, RubberBand oRubberBand, DisplayMode oTrackerMode, QWidget* pCanvas);
 #endif
 
     //Overload this function to return the tracker text with our units of choice
@@ -24,10 +24,15 @@ public:
 
     void    setXUnit(const QString &qstrXUnit);
     void    setYUnit(const QString &qstrYUnit);
+    void    setXIsTime(bool bIsTime);
+    void    setYIsTime(bool bIsTime);
 
 protected:
     QString m_qstrXUnit;
     QString m_qstrYUnit;
+
+    bool    m_bXIsTime;
+    bool    m_bYIsTime;
 
 signals:
 
