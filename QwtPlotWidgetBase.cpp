@@ -10,6 +10,7 @@
 #include <qwt_scale_engine.h>
 #include <qwt_plot_renderer.h>
 #include <qwt_text_label.h>
+#include <qwt_scale_widget.h>
 
 //Local includes
 #include "ui_QwtPlotWidgetBase.h"
@@ -31,11 +32,11 @@ cQwtPlotWidgetBase::cQwtPlotWidgetBase(QWidget *pParent) :
     m_pUI->setupUi(this);
 
     //Make the axis and title font a little bit smaller
-    m_oYFont = m_pUI->qwtPlot->axisTitle(QwtPlot::yLeft).font();
-    m_oYFont.setPointSizeF(m_oYFont.pointSizeF() * 0.65);
-
     m_oXFont = m_pUI->qwtPlot->axisTitle(QwtPlot::xBottom).font();
     m_oXFont.setPointSizeF(m_oXFont.pointSizeF() * 0.65);
+
+    m_oYFont = m_pUI->qwtPlot->axisTitle(QwtPlot::yLeft).font();
+    m_oYFont.setPointSizeF(m_oYFont.pointSizeF() * 0.65);
 
     m_oTitleFont = m_pUI->qwtPlot->titleLabel()->font();
     m_oTitleFont.setPointSizeF(m_oTitleFont.pointSizeF() * 0.7);
@@ -49,6 +50,18 @@ cQwtPlotWidgetBase::cQwtPlotWidgetBase(QWidget *pParent) :
     m_pPlotDistancePicker->setTrackerPen(QPen(Qt::white));
 
     m_pUI->qwtPlot->setAutoReplot(true);
+    m_pUI->qwtPlot->enableAxis(QwtPlot::yRight, true);
+
+    m_pUI->qwtPlot->axisScaleDraw(QwtPlot::yRight)->setMinimumExtent(40);
+    m_pUI->qwtPlot->axisScaleDraw(QwtPlot::yLeft)->setMinimumExtent(60);
+
+    //Set tick font to be a bit smaller than standard
+    QFont oAxisFont = m_pUI->qwtPlot->axisFont(QwtPlot::yLeft);
+    oAxisFont.setPointSizeF(oAxisFont.pointSizeF() * 0.8);
+    m_pUI->qwtPlot->setAxisFont(QwtPlot::yLeft, oAxisFont);
+    m_pUI->qwtPlot->setAxisFont(QwtPlot::yRight, oAxisFont);
+    m_pUI->qwtPlot->setAxisFont(QwtPlot::xBottom, oAxisFont);
+    m_pUI->qwtPlot->setAxisFont(QwtPlot::xTop, oAxisFont);
 
     QObject::connect(m_pUI->pushButton_pauseResume, SIGNAL(clicked()), this, SLOT(slotPauseResume()));
     QObject::connect(m_pUI->checkBox_autoscale, SIGNAL(clicked(bool)), this, SLOT(slotEnableAutoscale(bool)));
@@ -60,6 +73,8 @@ cQwtPlotWidgetBase::cQwtPlotWidgetBase(QWidget *pParent) :
     QObject::connect(this, SIGNAL(sigSetXScaleBase(int)), this, SLOT(slotSetXScaleBase(int)), Qt::QueuedConnection);
 
     QObject::connect(this, SIGNAL(sigStrobeAutoscale(unsigned int)), this, SLOT(slotStrobeAutoscale(unsigned int)), Qt::QueuedConnection);
+
+    QObject::connect(m_pUI->qwtPlot->axisWidget(QwtPlot::xBottom), SIGNAL(scaleDivChanged()), this, SLOT(slotScaleDivChanged()) );
 }
 
 cQwtPlotWidgetBase::~cQwtPlotWidgetBase()
@@ -270,11 +285,16 @@ void cQwtPlotWidgetBase::slotUpdateScalesAndLabels()
     }
     else
     {
-        QwtText oYLabel( QString("%1").arg(m_qstrYLabel) );
+        QwtText oYLabel( QString("%1\n").arg(m_qstrYLabel) );
         oYLabel.setFont(m_oYFont);
 
         m_pUI->qwtPlot->setAxisTitle(QwtPlot::yLeft, oYLabel);
     }
+
+    QwtText oYLabel( QString(" "));
+    oYLabel.setFont(m_oYFont);
+
+    m_pUI->qwtPlot->setAxisTitle(QwtPlot::yRight, oYLabel);
 
     m_pPlotPositionPicker->setXUnit(m_qstrXUnit);
     m_pPlotPositionPicker->setYUnit(m_qstrYUnit);
@@ -305,4 +325,15 @@ void cQwtPlotWidgetBase::autoUpdateXScaleBase(uint32_t u32NBins)
         sigSetXScaleBase(10);
         //Otherwise plot grid lines along base 10 numbers
     }
+}
+
+void cQwtPlotWidgetBase::slotUpdateXScaleDiv(double dMin, double dMax)
+{
+    m_pUI->qwtPlot->setAxisScale(QwtPlot::xBottom, dMin, dMax);
+    m_pUI->qwtPlot->replot();
+}
+
+void cQwtPlotWidgetBase::slotScaleDivChanged()
+{
+    sigXScaleDivChanged(m_pUI->qwtPlot->axisInterval(QwtPlot::xBottom).minValue(), m_pUI->qwtPlot->axisInterval(QwtPlot::xBottom).maxValue());
 }

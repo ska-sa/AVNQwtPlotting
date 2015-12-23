@@ -59,7 +59,7 @@ public:
 
     void                                enableTimestampInTitle(bool bEnable);
 
-    void                                strobeAutoscale(uint32_t u32Delay_ms = 100);
+    void                                strobeAutoscale(uint32_t u32Delay_ms = 500);
 
     void                                autoUpdateXScaleBase(uint32_t u32NBins); //Sets the X scale to base 2 ticks if the number of bins is a power of 2
 
@@ -103,17 +103,21 @@ public slots:
     virtual void                        slotEnableAutoscale(bool bEnable) = 0;
     void                                slotEnableAutoscale();
     void                                slotDisableAutoscale();
-    void                                slotStrobeAutoscale(unsigned int u32Delay_ms);
+    virtual void                        slotStrobeAutoscale(unsigned int u32Delay_ms);
+    void                                slotUpdateXScaleDiv(double dMin, double dMax);
 
 protected slots:
     virtual void                        slotUpdateScalesAndLabels();
     void                                slotSetXScaleBase(int iBase);
     void                                slotGrabFrame();
+    virtual void                        slotScaleDivChanged();
 
 signals:
     void                                sigUpdateScalesAndLabels();
     void                                sigSetXScaleBase(int iBase);
     void                                sigStrobeAutoscale(unsigned int u32Delay_ms);
+    void                                sigXScaleDivChanged(double dMin, double dMax);
+
 
 };
 

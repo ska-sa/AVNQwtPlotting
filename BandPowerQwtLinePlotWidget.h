@@ -38,7 +38,7 @@ public:
     virtual ~cBandPowerQwtLinePlot();
 
     //Add data should take an array containing the full selectable band as specified by the function below
-    virtual void                        addData(const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us = 0);
+    virtual void                        addData(const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us = 0, const QVector<uint32_t> &qvu32ChannelList = QVector<uint32_t>());
 
     void                                setSelectableBand(double dBandMinimum, double dBandMaximum, const QString &qstrUnit);
     void                                setIntegrationTimeControlScalingFactor(double dScalingFactor_s, const QString &qstrNewUnit, double dMaxSpinBoxValue);

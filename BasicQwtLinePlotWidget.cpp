@@ -8,7 +8,9 @@
 #include <QPrinter>
 #include <QPrintDialog>
 #include <QDebug>
+#include <QPalette>
 #include <qwt_scale_engine.h>
+#include <qwt_scale_widget.h>
 #include <qwt_legend.h>
 #if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
 #include <qwt_legend_item.h>
@@ -16,6 +18,7 @@
 #include <qwt_legend_label.h>
 #endif
 #include <qwt_plot_renderer.h>
+#include <qwt_symbol.h>
 
 //Local includes
 #include "BasicQwtLinePlotWidget.h"
@@ -33,6 +36,12 @@ cBasicQwtLinePlotWidget::cBasicQwtLinePlotWidget(QWidget *pParent) :
     //The background colour is not currently changable. A mutator can be added as necessary
     m_pUI->qwtPlot->setCanvasBackground(QBrush(QColor(Qt::black)));
     showPlotGrid(true);
+
+    //Hide right hand axis
+    QPalette oPalette = m_pUI->qwtPlot->axisWidget(QwtPlot::yRight)->palette();
+    oPalette.setColor(QPalette::WindowText, QColor(Qt::transparent));
+    oPalette.setColor(QPalette::Text, QColor(Qt::transparent));
+    m_pUI->qwtPlot->axisWidget(QwtPlot::yRight)->setPalette(oPalette);
 
     //Set up other plot controls
     m_pPlotZoomer = new cAnimatedQwtPlotZoomer(m_pUI->qwtPlot->canvas());
@@ -68,10 +77,7 @@ cBasicQwtLinePlotWidget::cBasicQwtLinePlotWidget(QWidget *pParent) :
 
     //Connections to update plot data as well as labels and scales are forced to be queued as the actual drawing of the widget needs to be done in the GUI thread
     //This allows an update request to come from an arbirary thread to get executed by the GUI thread
-    qRegisterMetaType<QVector<double> >("QVector<double>");
-    qRegisterMetaType<int64_t>("int64_t");
-    QObject::connect(this, SIGNAL(sigUpdatePlotData(unsigned int,QVector<double>,QVector<double>,int64_t)),
-                     this, SLOT(slotUpdatePlotData(unsigned int,QVector<double>,QVector<double>,int64_t)), Qt::QueuedConnection);
+    QObject::connect(this, SIGNAL(sigUpdatePlotData()), this, SLOT(slotUpdatePlotData()), Qt::QueuedConnection);
 
     //Metatypes used elsewhere:
     qRegisterMetaType<QList<QwtLegendData> >("QList<QwtLegendData>");
@@ -102,6 +108,8 @@ void cBasicQwtLinePlotWidget::addData(const QVector<float> &qvfXData, const QVec
     //Check if number of points to plot is 2 a power of 2 and set the X ticks to base 2 if so
     autoUpdateXScaleBase( m_qvdXDataToPlot.size() );
 
+    m_i64PlotTimestamp_us = i64Timestamp_us;
+
     //Do log conversions if required
 
     m_oMutex.lockForRead(); //Ensure the 2 bool flags don't change during these operations
@@ -122,13 +130,7 @@ void cBasicQwtLinePlotWidget::addData(const QVector<float> &qvfXData, const QVec
 
     if(!m_bIsPaused)
     {
-        //Check that there are enough curves for this data
-        updateCurves();
-
-        for(uint32_t u32ChannelNo = 0; u32ChannelNo < (unsigned)m_qvpPlotCurves.size(); u32ChannelNo++)
-        {
-            sigUpdatePlotData(u32ChannelNo, m_qvdXDataToPlot, m_qvvdYDataToPlot[u32ChannelNo], i64Timestamp_us);
-        }
+        sigUpdatePlotData();
     }
 
     m_oMutex.unlock();
@@ -348,29 +350,34 @@ void cBasicQwtLinePlotWidget::slotShowLegend(bool bEnable)
     }
 }
 
-void cBasicQwtLinePlotWidget::slotUpdatePlotData(unsigned int uiCurveNo, QVector<double> qvdXData, QVector<double> qvdYData, int64_t i64Timestamp_us)
+void cBasicQwtLinePlotWidget::slotUpdatePlotData()
 {
     //This function sends data to the actually plot widget in the GUI thread. This is necessary as draw the curve (i.e. updating the GUI) must be done in the GUI thread.
     //Connections to this slot should be queued if from signals not orginating from the GUI thread.
 
-    //cout << "cBasicQwtLinePlotWidget::slotUpdatePlotData() Thread is: " << QThread::currentThread() << endl;
+    //Check that the curves match the source data
+    updateCurves();
 
-    if(uiCurveNo >= (unsigned int)m_qvpPlotCurves.size())
+    for(uint32_t u32CurveNo = 0; u32CurveNo < (uint32_t)m_qvvdYDataToPlot.size(); u32CurveNo++)
     {
-        cout << "cBasicQwtLinePlotWidget::slotUpdatePlotData(): Warning: Requested plotting for curve index "
-             << uiCurveNo << " which is out of range [0, " << m_qvpPlotCurves.size() - 1 << "]. Ignoring." << endl;
 
-        return;
+        if(u32CurveNo >= (unsigned int)m_qvpPlotCurves.size())
+        {
+            cout << "cBasicQwtLinePlotWidget::slotUpdatePlotData(): Warning: Requested plotting for curve index "
+                 << u32CurveNo << " which is out of range [0, " << m_qvpPlotCurves.size() - 1 << "]. Ignoring." << endl;
+
+            continue;
+        }
+
+        m_qvpPlotCurves[u32CurveNo]->setSamples(m_qvdXDataToPlot, m_qvvdYDataToPlot[u32CurveNo]);
     }
-
-    m_qvpPlotCurves[uiCurveNo]->setSamples(qvdXData, qvdYData);
 
     //Update horizontal scale
     QRectF oRect = m_pPlotZoomer->zoomBase();
-    if(oRect.left() != qvdXData.first() || oRect.right() != qvdXData.last() )
+    if(oRect.left() != m_qvdXDataToPlot.first() || oRect.right() != m_qvdXDataToPlot.last() )
     {
-        oRect.setLeft(qvdXData.first() );
-        oRect.setRight(qvdXData.last() );
+        oRect.setLeft(m_qvdXDataToPlot.first() );
+        oRect.setRight(m_qvdXDataToPlot.last() );
 
         m_pPlotZoomer->setZoomBase(oRect);
         m_pPlotZoomer->zoom(oRect);
@@ -379,7 +386,7 @@ void cBasicQwtLinePlotWidget::slotUpdatePlotData(unsigned int uiCurveNo, QVector
     //Update timestamp in Title if needed
     if(m_bTimestampInTitleEnabled)
     {
-        m_pUI->qwtPlot->setTitle( QString("%1 - %2").arg(m_qstrTitle).arg(AVN::stringFromTimestamp_full(i64Timestamp_us).c_str()) );
+        m_pUI->qwtPlot->setTitle( QString("%1 - %2").arg(m_qstrTitle).arg(AVN::stringFromTimestamp_full(m_i64PlotTimestamp_us).c_str()) );
     }
 }
 
@@ -396,7 +403,7 @@ void cBasicQwtLinePlotWidget::slotUpdateScalesAndLabels()
 
 #if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
 void cBasicQwtLinePlotWidget::slotLegendChecked(QwtPlotItem *pPlotItem, bool bChecked)
-{  
+{
     if(pPlotItem)
         showCurve(pPlotItem, bChecked);
 }
@@ -423,7 +430,7 @@ void cBasicQwtLinePlotWidget::updateCurves()
     //Make sure that there is a curve for each channel
     if(m_qvpPlotCurves.size() != m_qvvdYDataToPlot.size())
     {
-        cout << "cBasicQwtLinePlotWidget::updateCurves() Updating to " << m_qvvdYDataToPlot.size() << " plot curves for plot " << m_qstrTitle.toStdString() << endl;
+        cout << "cBasicQwtLinePlotWidget::slotUpdateCurves() Updating to " << m_qvvdYDataToPlot.size() << " plot curves for plot " << m_qstrTitle.toStdString() << endl;
 
         //If not, delete existing curves
         for(uint32_t u32ChannelNo = 0; u32ChannelNo < (unsigned)m_qvpPlotCurves.size(); u32ChannelNo++)
@@ -448,6 +455,7 @@ void cBasicQwtLinePlotWidget::updateCurves()
             m_qvpPlotCurves[u32ChannelNo]->setPen(QPen(m_qveCurveColours[u32ChannelNo]));
 #else
             m_qvpPlotCurves[u32ChannelNo]->setPen(m_qveCurveColours[u32ChannelNo], 1.0, Qt::SolidLine);
+            m_qvpPlotCurves[u32ChannelNo]->setSymbol(new QwtSymbol(QwtSymbol::Cross, Qt::NoBrush, QPen( m_qveCurveColours[u32ChannelNo] ), QSize( 3, 3 ) ));
 #endif
         }
     }

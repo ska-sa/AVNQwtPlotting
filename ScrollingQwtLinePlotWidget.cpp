@@ -111,6 +111,15 @@ void cScrollingQwtLinePlotWidget::processYData(const QVector<QVector<float> > &q
     //cout << "cScrollingQwtLinePlotWidget::processXData(): m_qvdYDataToPlot is " << m_qvvdYDataToPlot[0].size() << " samples long." << endl;
 }
 
+void cScrollingQwtLinePlotWidget::resetHistory()
+{
+    for(uint32_t u32ChannelNo = 0; u32ChannelNo < (uint32_t)m_qvvdYDataToPlot.size(); u32ChannelNo++)
+    {
+        m_qvvdYDataToPlot[u32ChannelNo].clear();
+    }
+    m_qvdXDataToPlot.clear();
+}
+
 void cScrollingQwtLinePlotWidget::logConversion()
 {
     //Here we have to keep track of values already converted to dB.

@@ -19,20 +19,21 @@ cWaterfallQwtPlotWidget::cWaterfallQwtPlotWidget(uint32_t u32ChannelNo, const QS
     m_u32AverageCount(0),
     m_pTimeScaleDraw(new cWallTimeQwtScaleDraw),
     m_u32ChannelNo(u32ChannelNo),
-    m_qstrChannelName(qstrChannelName)
+    m_qstrChannelName(qstrChannelName),
+    m_bAutoscaleValid(false)
 {
     //Additional controls to the waterfall widget
     m_pIntensityFloorLabel = new QLabel(QString("Intensity floor"), this);
     m_pIntensityFloorSpinBox = new QDoubleSpinBox(this);
-    m_pIntensityFloorSpinBox->setDecimals(0);
-    m_pIntensityFloorSpinBox->setMaximum(200.0);
-    m_pIntensityFloorSpinBox->setMinimum(-200.0);
+    m_pIntensityFloorSpinBox->setDecimals(1);
+    m_pIntensityFloorSpinBox->setMaximum(1e10);
+    m_pIntensityFloorSpinBox->setMinimum(-1e10);
 
     m_pIntensityCeilingLabel = new QLabel(QString("Intensity ceiling"), this);
     m_pIntensityCeilingSpinBox = new QDoubleSpinBox(this);
-    m_pIntensityCeilingSpinBox->setDecimals(0);
-    m_pIntensityCeilingSpinBox->setMaximum(200.0);
-    m_pIntensityCeilingSpinBox->setMinimum(-200.0);
+    m_pIntensityCeilingSpinBox->setDecimals(1);
+    m_pIntensityCeilingSpinBox->setMaximum(1e10);
+    m_pIntensityCeilingSpinBox->setMinimum(-1e10);
 
     insertWidgetIntoControlFrame(m_pIntensityFloorLabel, 3);
     insertWidgetIntoControlFrame(m_pIntensityFloorSpinBox, 4, true);
@@ -58,7 +59,6 @@ cWaterfallQwtPlotWidget::cWaterfallQwtPlotWidget(uint32_t u32ChannelNo, const QS
     m_pColourMap->addColorStop(0.75, Qt::yellow);
 
     m_pUI->qwtPlot->enableAxis(QwtPlot::yRight);
-    m_pUI->qwtPlot->axisWidget(QwtPlot::yRight)->setTitle("Power Level [dB]");
     m_pUI->qwtPlot->axisWidget(QwtPlot::yRight)->setColorBarEnabled(true);
     m_pUI->qwtPlot->axisWidget(QwtPlot::yRight)->setColorMap(QwtInterval (50, 80), m_pColourMap);
     m_pUI->qwtPlot->setAxisScale(QwtPlot::yRight, 50, 80);
@@ -74,12 +74,19 @@ cWaterfallQwtPlotWidget::cWaterfallQwtPlotWidget(uint32_t u32ChannelNo, const QS
 
     m_pSpectrogramData->setDimensions(0, 200);
 
+    //Offset width of colour bar in right hand plot spacing
+    m_pUI->qwtPlot->axisScaleDraw(QwtPlot::yRight)->setMinimumExtent(m_pUI->qwtPlot->axisScaleDraw(QwtPlot::yRight)->minimumExtent()
+                                                                     - m_pUI->qwtPlot->axisWidget(QwtPlot::yRight)->colorBarWidth());
+
+
     //Install custom time scale drawer for the Y axis
     m_pUI->qwtPlot->setAxisScaleDraw(QwtPlot::yLeft, m_pTimeScaleDraw);
 
     QObject::connect(this, SIGNAL(sigUpdateData()), this, SLOT(slotUpdateData()), Qt::QueuedConnection);
     QObject::connect(m_pIntensityFloorSpinBox, SIGNAL(valueChanged(double)), this, SLOT(slotIntensityFloorChanged(double)) );
     QObject::connect(m_pIntensityCeilingSpinBox, SIGNAL(valueChanged(double)), this, SLOT(slotIntensityCeilingChanged(double)) );
+
+    strobeAutoscale();
 }
 
 cWaterfallQwtPlotWidget::~cWaterfallQwtPlotWidget()
@@ -141,12 +148,47 @@ void cWaterfallQwtPlotWidget::addData(const QVector<float> &qvfYData, int64_t i6
     }
     m_u32AverageCount = 0;
 
-    //Calculate the min and max of the spectrogram data
-    m_pSpectrogramData->getZMinMaxValue(m_dZMin, m_dZMax);
-    m_dZMax = 10 * log10(m_dZMax + 0.001);
-    m_dZMin = 10 * log10(m_dZMin + 0.001);
-    if(m_dZMax - m_dZMin > 100.0)
-        m_dZMin = m_dZMax - 100.0;
+    //Calculate the min and max plotting range of the spectrogram data
+    float fMedian = m_pSpectrogramData->getMedian();
+    double dDataMax, dDataMin;
+    m_pSpectrogramData->getZMinMaxValue(dDataMin, dDataMax);
+
+    if(m_bDoLogConversion)
+    {
+        float dMedian_dB = 10 * log10(fMedian);
+        m_dZScaleMax = dMedian_dB + 20;
+        m_dZScaleMin = dMedian_dB - 5;
+
+        if(m_dZScaleMax > 10 * log10(dDataMax))
+            m_dZScaleMax = 10 * log10(dDataMax);
+
+        if(m_dZScaleMin < 10 * log10(dDataMin))
+            m_dZScaleMin = 10 * log10(dDataMin);
+    }
+    else if(m_bDoPowerLogConversion)
+    {
+        float dMedian_dB = 20 * log10(fMedian);
+        m_dZScaleMax = dMedian_dB + 20;
+        m_dZScaleMin = dMedian_dB - 5;
+
+        if(m_dZScaleMax > 20 * log10(dDataMax))
+            m_dZScaleMax = 20 * log10(dDataMax);
+
+        if(m_dZScaleMin < 20 * log10(dDataMin))
+            m_dZScaleMin = 20 * log10(dDataMin);
+    }
+    else
+    {
+        float dMedian_dB = 10 * log10(fMedian);
+        m_dZScaleMax = dMedian_dB * 100000;
+        m_dZScaleMin = dMedian_dB - m_dZScaleMax;
+
+        if(m_dZScaleMax > dDataMax)
+            m_dZScaleMax = dDataMax;
+
+        if(m_dZScaleMin < dDataMin)
+            m_dZScaleMin = dDataMin;
+    }
 
     if(!m_bIsPaused)
     {
@@ -169,13 +211,26 @@ void cWaterfallQwtPlotWidget::slotUpdateData()
 
     if(m_bIsAutoscaleEnabled)
     {
-        setZRange(m_dZMin, m_dZMax);
+        if(isfinite(m_dZScaleMin) && isfinite(m_dZScaleMax)) //Check for inf, nan etc.
+        {
+            setZRange(m_dZScaleMin, m_dZScaleMax);
+
+            QWriteLocker oLock(&m_oMutex);
+            m_bAutoscaleValid = true;
+        }
+        else
+        {
+            cout << "cWaterfallQwtPlotWidget::slotUpdateData(): Autoscale returned non-finite range [" << m_dZScaleMin << ", " << m_dZScaleMax << "] ignoring." << endl;
+
+            QWriteLocker oLock(&m_oMutex);
+            m_bAutoscaleValid = false;
+        }
 
         m_pIntensityFloorSpinBox->blockSignals(true);
         m_pIntensityCeilingSpinBox->blockSignals(true);
 
-        m_pIntensityFloorSpinBox->setValue(m_dZMin);
-        m_pIntensityCeilingSpinBox->setValue(m_dZMax);
+        m_pIntensityFloorSpinBox->setValue(m_dZScaleMin);
+        m_pIntensityCeilingSpinBox->setValue(m_dZScaleMax);
 
         m_pIntensityFloorSpinBox->blockSignals(false);
         m_pIntensityCeilingSpinBox->blockSignals(false);
@@ -193,9 +248,31 @@ void cWaterfallQwtPlotWidget::slotEnableAutoscale(bool bEnable)
     m_pIntensityCeilingSpinBox->setDisabled(bEnable);
 }
 
-void cWaterfallQwtPlotWidget::slotSetXSpan(double dStart, double dEnd)
+void cWaterfallQwtPlotWidget::slotStrobeAutoscale(unsigned int u32Delay_ms)
 {
-    m_pUI->qwtPlot->setAxisScale(QwtPlot::xBottom, dStart, dEnd);
+    cout << "cWaterfallQwtPlotWidget::strobeAutoscale() strobing autoscale for plot " << m_qstrTitle.toStdString() << " in " << u32Delay_ms << " ms. Or until valid" << endl;
+
+    //If autoscale is already on for this plot do nothing
+    if(m_bIsAutoscaleEnabled)
+        return;
+
+    QTimer::singleShot(u32Delay_ms, this, SLOT(slotEnableAutoscale()));
+    QTimer::singleShot(u32Delay_ms + 100, this, SLOT(slotDisableAutoscaleOnSuccess())); //Switch off 100 ms later
+}
+
+void cWaterfallQwtPlotWidget::slotDisableAutoscaleOnSuccess()
+{
+    QReadLocker oLock(&m_oMutex);
+
+    if(m_bAutoscaleValid)
+    {
+        slotEnableAutoscale(false);
+    }
+    else
+    {
+        //Recheck for a valid autoscale in 100 millseconds time.
+        QTimer::singleShot(100, this, SLOT(slotDisableAutoscaleOnSuccess()));
+    }
 }
 
 void cWaterfallQwtPlotWidget::slotIntensityFloorChanged(double dValue)
@@ -224,8 +301,8 @@ void cWaterfallQwtPlotWidget::slotUpdateScalesAndLabels()
         QwtText oZLabel(QwtText(QString("%1 [%2]").arg(m_qstrZLabel).arg(m_qstrZUnit)) );
         oZLabel.setFont(m_oZFont);
 
-        m_pIntensityCeilingSpinBox->setSuffix(QString(" %1").arg(m_qstrYUnit));
-        m_pIntensityFloorSpinBox->setSuffix(QString(" %1").arg(m_qstrYUnit));
+        m_pIntensityCeilingSpinBox->setSuffix(QString(" %1").arg(m_qstrZUnit));
+        m_pIntensityFloorSpinBox->setSuffix(QString(" %1").arg(m_qstrZUnit));
 
         m_pUI->qwtPlot->setAxisTitle(QwtPlot::yRight, oZLabel);
     }
@@ -237,6 +314,20 @@ void cWaterfallQwtPlotWidget::slotUpdateScalesAndLabels()
         m_pIntensityCeilingSpinBox->setSuffix(QString(""));
         m_pIntensityFloorSpinBox->setSuffix(QString(""));
 
-        m_pUI->qwtPlot->setAxisTitle(QwtPlot::xBottom, oZLabel);
+        m_pUI->qwtPlot->setAxisTitle(QwtPlot::yRight, oZLabel);
     }
+}
+
+void cWaterfallQwtPlotWidget::enableLogConversion(bool bEnable)
+{
+    cQwtPlotWidgetBase::enableLogConversion(bEnable);
+
+    m_pSpectrogramData->enableLogConversion(bEnable);
+}
+
+void cWaterfallQwtPlotWidget::enablePowerLogConversion(bool bEnable)
+{
+    cQwtPlotWidgetBase::enablePowerLogConversion(bEnable);
+
+    m_pSpectrogramData->enablePowerLogConversion(bEnable);
 }

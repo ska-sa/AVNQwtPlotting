@@ -87,19 +87,21 @@ protected:
     QReadWriteLock                      m_oWaterfallPlotMutex;
     void                                addWaterfallPlot(uint32_t u32ChannelNo, const QString &qstrChannelName);
     void                                removeWaterfallPlot(const QString &qstrChannelName);
+    void                                removeAllWaterfallPlots();
 
-    virtual void                        updateCurves();
+    void                                updateCurves();
 
     virtual void                        processXData(const QVector<float> &qvfXData, int64_t i64Timestamp_us = 0);
     virtual void                        processYData(const QVector<QVector<float> > &qvvfXData, int64_t i64Timestamp_us = 0, const QVector<uint32_t> &qvu32ChannelList = QVector<uint32_t>());
 
 public slots:
     void                                slotSetAverage(int iAveraging);
+    virtual void                        slotStrobeAutoscale(unsigned int u32Delay_ms);
 
 private slots:
     virtual void                        slotUpdateScalesAndLabels();
     void                                slotWaterFallPlotEnabled(QAction* pAction);
-    void                                slotUpdateWaterPlotXScale();
+    virtual void                        slotScaleDivChanged();
 
 };
 

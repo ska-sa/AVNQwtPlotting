@@ -2,6 +2,7 @@
 #include <iostream>
 #include <cmath>
 #include <cfloat>
+#include <algorithm>
 
 //Library includes
 
@@ -14,7 +15,9 @@ using namespace std;
 cWaterfallPlotSpectromgramData::cWaterfallPlotSpectromgramData() :
     m_u32NextFrameIndex(0),
     m_u32NRows(0),
-    m_u32NColumns(0)
+    m_u32NColumns(0),
+    m_bDoLogConversion(false),
+    m_bDoPowerLogConversion(false)
 {
 }
 
@@ -43,7 +46,13 @@ double cWaterfallPlotSpectromgramData::value( double dX, double dY ) const
     if ( ui32Col >= m_u32NColumns )
         ui32Col = m_u32NColumns - 1;
 
-    return 10.0 * log10(m_qvvfCircularBuffer[unwrapCircularBufferIndex(ui32Row)][ui32Col] + 0.001);
+    if(m_bDoLogConversion)
+        return 10.0 * log10(m_qvvfCircularBuffer[unwrapCircularBufferIndex(ui32Row)][ui32Col] + 0.001);
+
+    if(m_bDoPowerLogConversion)
+        return 20.0 * log10(m_qvvfCircularBuffer[unwrapCircularBufferIndex(ui32Row)][ui32Col] + 0.001);
+
+    return m_qvvfCircularBuffer[unwrapCircularBufferIndex(ui32Row)][ui32Col];
 }
 
 void cWaterfallPlotSpectromgramData::setInterval( Qt::Axis eAxis, const QwtInterval &oInterval)
@@ -138,7 +147,7 @@ uint32_t cWaterfallPlotSpectromgramData::unwrapCircularBufferIndex(uint32_t u32L
 
 void cWaterfallPlotSpectromgramData::getZMinMaxValue(double &dZMin, double &dZMax) const
 {
-    double dZMaxTmp = DBL_MIN;
+    double dZMaxTmp = -DBL_MAX;
     double dZMinTmp = DBL_MAX;
 
     for(uint32_t u32Y = 0; u32Y < (uint32_t)m_qvvfCircularBuffer.size(); u32Y++)
@@ -155,5 +164,37 @@ void cWaterfallPlotSpectromgramData::getZMinMaxValue(double &dZMin, double &dZMa
 
     dZMax = dZMaxTmp;
     dZMin = dZMinTmp;
+}
+
+double cWaterfallPlotSpectromgramData::getMedian() const
+{
+    //Create vector and copy all amplitudes into it
+    std::vector<float> vfAllAmplitudes(m_u32NRows * m_u32NColumns);
+
+    for(uint32_t u32Y = 0; u32Y < m_u32NRows; u32Y++)
+    {
+        memcpy(&vfAllAmplitudes[u32Y * m_u32NColumns], &m_qvvfCircularBuffer[u32Y][0], sizeof(float) * m_u32NColumns);
+    }
+
+    std::partial_sort(vfAllAmplitudes.begin(), vfAllAmplitudes.begin() + m_u32NRows * m_u32NColumns / 2 + 1, vfAllAmplitudes.end());
+
+    //Return median as linear amplitude
+    return vfAllAmplitudes[m_u32NRows * m_u32NColumns / 2];
+}
+
+void cWaterfallPlotSpectromgramData::enableLogConversion(bool bEnable)
+{
+    m_bDoLogConversion = bEnable;
+
+    if(m_bDoLogConversion)
+        m_bDoPowerLogConversion = false;
+}
+
+void cWaterfallPlotSpectromgramData::enablePowerLogConversion(bool bEnable)
+{
+    m_bDoPowerLogConversion = bEnable;
+
+    if(m_bDoPowerLogConversion)
+        m_bDoLogConversion = false;
 }
 

@@ -58,6 +58,9 @@ public:
     void                                addData(const QVector<float> &qvfYData, int64_t i64Timestamp_us);
 
     void                                setXRange(double dX1, double dX2);
+
+    void                                enableLogConversion(bool bEnable);
+    void                                enablePowerLogConversion(bool bEnable);
     
 private:
     QwtPlotSpectrogram                  *m_pPlotSpectrogram;
@@ -83,15 +86,13 @@ private:
     QLabel                              *m_pIntensityFloorLabel;
     QLabel                              *m_pIntensityCeilingLabel;
 
-    QFont                               m_oTitleFont;
-    QFont                               m_oXFont;
-    QFont                               m_oYFont;
-
     uint32_t                            m_u32ChannelNo;
     QString                             m_qstrChannelName;
 
-    double                              m_dZMin;
-    double                              m_dZMax;
+    double                              m_dZScaleMin;
+    double                              m_dZScaleMax;
+
+    bool                                m_bAutoscaleValid;
 
     void                                setZRange(double dZMin, double dZMax);
     
@@ -100,13 +101,14 @@ signals:
 
 public slots:
     virtual void                        slotEnableAutoscale(bool bEnable);
-    void                                slotSetXSpan(double dStart, double dEnd);
+    virtual void                        slotStrobeAutoscale(unsigned int u32Delay_ms);
 
 protected slots:
     virtual void                        slotUpdateScalesAndLabels();
     void                                slotUpdateData();
     void                                slotIntensityFloorChanged(double dValue);
     void                                slotIntensityCeilingChanged(double dValue);
+    void                                slotDisableAutoscaleOnSuccess();
 
 };
 

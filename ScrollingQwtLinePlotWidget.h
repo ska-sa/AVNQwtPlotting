@@ -38,6 +38,8 @@ public:
     void                                showSpanLengthControl(bool bEnable);
     void                                setSpanLengthControlScalingFactor(double dScalingFactor, const QString &qstrNewUnit);
 
+    void                                resetHistory();
+
 protected:
     //GUI Widgets
     QDoubleSpinBox                      *m_pSpanLengthDoubleSpinBox;

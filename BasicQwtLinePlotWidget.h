@@ -71,6 +71,7 @@ protected:
     //Data stuctures
     QVector<QVector<double> >           m_qvvdYDataToPlot;
     QVector<double>                     m_qvdXDataToPlot;
+    int64_t                             m_i64PlotTimestamp_us;
 
     bool                                m_bIsGridShown;
     bool                                m_bShowVerticalLines;
@@ -78,13 +79,14 @@ protected:
     //Controls
 
     void                                showCurve(QwtPlotItem *pItem, bool bShow);
-    virtual void                        updateCurves();
 
     virtual void                        processXData(const QVector<float> &qvfXData, int64_t i64Timestamp_us = 0);
     virtual void                        processYData(const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us = 0, const QVector<uint32_t> &qvu32ChannelList = QVector<uint32_t>());
 
     virtual void                        logConversion();
     virtual void                        powerLogConversion();
+
+    virtual void                        updateCurves();
 
 public slots:
     virtual void                        slotEnableAutoscale(bool bEnable);
@@ -94,7 +96,7 @@ public slots:
     void                                slotShowVerticalLines(bool bShow);
 
 protected slots:
-    virtual void                        slotUpdatePlotData(unsigned int uiCurveNo, QVector<double> qvdXData, QVector<double> qvdYData, int64_t i64Timestamp_us);
+    virtual void                        slotUpdatePlotData();
     virtual void                        slotUpdateScalesAndLabels();
 #if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
     void                                slotLegendChecked(QwtPlotItem *pPlotItem, bool bChecked);
@@ -103,7 +105,7 @@ protected slots:
 #endif
 
 signals:
-    void                                sigUpdatePlotData(unsigned int uiCurveNo, QVector<double> qvdXData, QVector<double> qvdYData, int64_t i64Timestamp_us);
+    void                                sigUpdatePlotData();
 
 };
 

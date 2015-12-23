@@ -37,6 +37,10 @@ public:
     int64_t                     getMaxTime_us() const;
 
     void                        getZMinMaxValue(double &dZMin, double &dZMax) const;
+    double                      getMedian() const;
+
+    void                        enableLogConversion(bool bEnable);
+    void                        enablePowerLogConversion(bool bEnable);
 
 private:
     QVector< QVector<float> >   m_qvvfCircularBuffer;
@@ -49,6 +53,9 @@ private:
 
     double                      m_dDeltaX;
     double                      m_dDeltaY;
+
+    bool                        m_bDoLogConversion;
+    bool                        m_bDoPowerLogConversion;
 
     void                        update();
 

@@ -40,8 +40,6 @@ cFramedQwtLinePlotWidget::cFramedQwtLinePlotWidget(QWidget *pParent) :
 
     QObject::connect(m_pAveragingSpinBox, SIGNAL(valueChanged(int)), this, SLOT(slotSetAverage(int)));
     QObject::connect(m_pWaterfallMenu, SIGNAL(triggered(QAction*)), this, SLOT(slotWaterFallPlotEnabled(QAction*)));
-
-    QObject::connect(m_pUI->qwtPlot->axisWidget(QwtPlot::xBottom), SIGNAL(scaleDivChanged ()), this, SLOT(slotUpdateWaterPlotXScale()));
 }
 
 cFramedQwtLinePlotWidget::~cFramedQwtLinePlotWidget()
@@ -60,7 +58,7 @@ void cFramedQwtLinePlotWidget::addData(const QVector<QVector<float> > &qvvfYData
         //Also pass data to any existing waterfall plots
         for(uint32_t ui = 0; ui < (uint32_t)m_qvpWaterfallPlots.size(); ui++)
         {
-            m_qvpWaterfallPlots[ui]->addData(qvvfYData[m_qvpWaterfallPlots[ui]->getChannelNo()], i64Timestamp_us);
+            m_qvpWaterfallPlots[ui]->addData(qvvfYData[ qvu32ChannelList[m_qvpWaterfallPlots[ui]->getChannelNo()] ], i64Timestamp_us);
         }
     }
 }
@@ -288,9 +286,9 @@ void cFramedQwtLinePlotWidget::updateCurves()
     //But also populated the waterfall menu with the correct number of curves.
     if(m_pWaterfallMenu->actions().size() != m_qvvdYDataToPlot.size())
     {
-        cout << "cFramedQwtLinePlotWidget::updateCurves() Updating to " << m_qvvdYDataToPlot.size() << " plot menu entries for waterfall plot " << m_qstrTitle.toStdString() << endl;
+        cout << "cFramedQwtLinePlotWidget::slotUpdateCurves() Updating to " << m_qvvdYDataToPlot.size() << " plot menu entries for waterfall plot " << m_qstrTitle.toStdString() << endl;
 
-        //If not, delete menu entries
+        removeAllWaterfallPlots();
         m_pWaterfallMenu->clear();
 
         //Create new entries
@@ -342,18 +340,30 @@ void cFramedQwtLinePlotWidget::addWaterfallPlot(uint32_t u32ChannelNo, const QSt
 
     {
         QReadLocker oLock(&m_oWaterfallPlotMutex);
-        cout << "Setting waterfall plot " << pWaterfallPlot->getChannelName().toStdString() << "X span to " << m_dXBegin << ", " << m_dXEnd << endl;
+        cout << "Setting waterfall plot " << pWaterfallPlot->getChannelName().toStdString() << " X-span to " << m_dXBegin << ", " << m_dXEnd << endl;
         pWaterfallPlot->setXRange(m_dXBegin, m_dXEnd);
         pWaterfallPlot->setXLabel(m_qstrXLabel);
         pWaterfallPlot->setXUnit(m_qstrXUnit);
         pWaterfallPlot->setYLabel(QString("Timestamp"));
         pWaterfallPlot->setYScaleIsTime(true);
         pWaterfallPlot->setZLabel(m_qstrYLabel);
+        cout << "Setting label unit to " << m_qstrYLabel.toStdString() << endl;
         pWaterfallPlot->setZUnit(m_qstrYUnit);
+        cout << "Setting Z unit to " << m_qstrYUnit.toStdString() << endl;
         pWaterfallPlot->setTitle(qstrChannelName);
+
+        //Use the same scale dB / linear as the frame plot
+        if(m_bDoLogConversion)
+        {
+            pWaterfallPlot->enableLogConversion(true);
+        }
+        else if(m_bDoPowerLogConversion)
+        {
+            pWaterfallPlot->enablePowerLogConversion(true);
+        }
     }
 
-    slotUpdateWaterPlotXScale();
+    slotScaleDivChanged();
 }
 
 void cFramedQwtLinePlotWidget::removeWaterfallPlot(const QString &qstrChannelName)
@@ -377,13 +387,26 @@ void cFramedQwtLinePlotWidget::removeWaterfallPlot(const QString &qstrChannelNam
     }
 }
 
-void cFramedQwtLinePlotWidget::slotUpdateWaterPlotXScale()
+void cFramedQwtLinePlotWidget::removeAllWaterfallPlots()
 {
+    QWriteLocker oLock(&m_oWaterfallPlotMutex);
+
+    for(uint32_t ui = 0; ui < (uint32_t)m_qvpWaterfallPlots.size();)
+    {
+        delete m_qvpWaterfallPlots[ui];
+        m_qvpWaterfallPlots.erase(m_qvpWaterfallPlots.begin() + ui);
+    }
+}
+
+void cFramedQwtLinePlotWidget::slotScaleDivChanged()
+{
+    cBasicQwtLinePlotWidget::slotScaleDivChanged();
+
     QReadLocker oLock(&m_oWaterfallPlotMutex);
 
     for(uint32_t ui = 0; ui < (uint32_t)m_qvpWaterfallPlots.size(); ui++)
     {
-        m_qvpWaterfallPlots[ui]->slotSetXSpan(m_pUI->qwtPlot->axisInterval(QwtPlot::xBottom).minValue(), m_pUI->qwtPlot->axisInterval(QwtPlot::xBottom).maxValue());
+        m_qvpWaterfallPlots[ui]->slotUpdateXScaleDiv(m_pUI->qwtPlot->axisInterval(QwtPlot::xBottom).minValue(), m_pUI->qwtPlot->axisInterval(QwtPlot::xBottom).maxValue());
     }
 }
 
@@ -400,5 +423,15 @@ void cFramedQwtLinePlotWidget::slotUpdateScalesAndLabels()
         m_qvpWaterfallPlots[ui]->setXUnit(m_qstrXUnit);
         m_qvpWaterfallPlots[ui]->setZLabel(m_qstrYLabel);
         m_qvpWaterfallPlots[ui]->setZUnit(m_qstrYUnit);
+    }
+}
+
+void cFramedQwtLinePlotWidget::slotStrobeAutoscale(unsigned int u32Delay_ms)
+{
+    cQwtPlotWidgetBase::slotStrobeAutoscale(u32Delay_ms);
+
+    for(uint32_t ui = 0; ui < (uint32_t)m_qvpWaterfallPlots.size(); ui++)
+    {
+        m_qvpWaterfallPlots[ui]->slotStrobeAutoscale(u32Delay_ms);
     }
 }

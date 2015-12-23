@@ -65,7 +65,7 @@ cBandPowerQwtLinePlot::~cBandPowerQwtLinePlot()
 {
 }
 
-void cBandPowerQwtLinePlot::addData(const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us)
+void cBandPowerQwtLinePlot::addData(const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us, const QVector<uint32_t> &qvu32ChannelList)
 {
 
     double dSelectedBandWidth = m_dSelectedBandStop - m_dSelectedBandStart;
@@ -81,28 +81,66 @@ void cBandPowerQwtLinePlot::addData(const QVector<QVector<float> > &qvvfYData, i
     //cout << "Start index = " << u32StartIndex << ", stop index = " << u32StopIndex << endl;
 
     //Check that we have correct number of channels
-    if(m_qvvfIntergratedPower.size() != qvvfYData.size())
+    //If a channel list is supplied
+    if(qvu32ChannelList.size())
     {
-        m_qvvfIntergratedPower.resize(qvvfYData.size());
-
-        for(uint32_t u32ChannelNo = 0; u32ChannelNo < (uint32_t)m_qvvfIntergratedPower.size(); u32ChannelNo++)
+        if(m_qvvfIntergratedPower.size() != qvu32ChannelList.size())
         {
-            m_qvvfIntergratedPower[u32ChannelNo].resize(1); //Only a single sample of integration output is added per iteration
+            m_qvvfIntergratedPower.resize(qvu32ChannelList.size());
+
+            for(uint32_t u32ChannelNo = 0; u32ChannelNo < (uint32_t)m_qvvfIntergratedPower.size(); u32ChannelNo++)
+            {
+                m_qvvfIntergratedPower[u32ChannelNo].resize(1); //Only a single sample of integration output is added per iteration
+            }
+        }
+    }
+    //Otherwise all channels
+    else
+    {
+        if(m_qvvfIntergratedPower.size() != qvvfYData.size())
+        {
+            m_qvvfIntergratedPower.resize(qvvfYData.size());
+
+            for(uint32_t u32ChannelNo = 0; u32ChannelNo < (uint32_t)m_qvvfIntergratedPower.size(); u32ChannelNo++)
+            {
+                m_qvvfIntergratedPower[u32ChannelNo].resize(1); //Only a single sample of integration output is added per iteration
+            }
         }
     }
 
     //Now for each channel sum the values over the specified frequency range
-    for(uint32_t u32ChannelNo = 0; u32ChannelNo < (uint32_t)m_qvvfIntergratedPower.size(); u32ChannelNo++)
+    //If a channel list is supplied
+    if(qvu32ChannelList.size())
     {
-        if(m_bNewIntegration)
+        for(uint32_t u32ChannelNo = 0; u32ChannelNo < (uint32_t)m_qvvfIntergratedPower.size(); u32ChannelNo++)
         {
-            m_qvvfIntergratedPower[u32ChannelNo][0] = 0.0; //Reset integrated power to 0
-        }
+            if(m_bNewIntegration)
+            {
+                m_qvvfIntergratedPower[u32ChannelNo][0] = 0.0; //Reset integrated power to 0
+            }
 
-        //Integrate
-        for(uint32_t u32Index = u32StartIndex; u32Index <= u32StopIndex && u32Index < (uint32_t)qvvfYData[u32ChannelNo].size(); u32Index++)
+            //Integrate
+            for(uint32_t u32Index = u32StartIndex; u32Index <= u32StopIndex && u32Index < (uint32_t)qvvfYData[ qvu32ChannelList[u32ChannelNo] ].size(); u32Index++)
+            {
+                m_qvvfIntergratedPower[u32ChannelNo][0] += std::fabs( qvvfYData[ qvu32ChannelList[u32ChannelNo] ][u32Index] );
+            }
+        }
+    }
+    //Otherwise all channels
+    else
+    {
+        for(uint32_t u32ChannelNo = 0; u32ChannelNo < (uint32_t)m_qvvfIntergratedPower.size(); u32ChannelNo++)
         {
-            m_qvvfIntergratedPower[u32ChannelNo][0] += std::fabs( qvvfYData[u32ChannelNo][u32Index] );
+            if(m_bNewIntegration)
+            {
+                m_qvvfIntergratedPower[u32ChannelNo][0] = 0.0; //Reset integrated power to 0
+            }
+
+            //Integrate
+            for(uint32_t u32Index = u32StartIndex; u32Index <= u32StopIndex && u32Index < (uint32_t)qvvfYData[u32ChannelNo].size(); u32Index++)
+            {
+                m_qvvfIntergratedPower[u32ChannelNo][0] += std::fabs( qvvfYData[u32ChannelNo][u32Index] );
+            }
         }
     }
 
