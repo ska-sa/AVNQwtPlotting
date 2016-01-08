@@ -89,8 +89,6 @@ cBasicQwtLinePlotWidget::~cBasicQwtLinePlotWidget()
     {
         delete m_qvpPlotCurves[uiChannelNo];
     }
-
-    delete m_pUI;
 }
 
 void cBasicQwtLinePlotWidget::addData(const QVector<float> &qvfXData, const QVector<QVector<float> > &qvvfYData, int64_t i64Timestamp_us, const QVector<uint32_t> &qvu32ChannelList)
