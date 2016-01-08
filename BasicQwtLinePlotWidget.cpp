@@ -73,14 +73,14 @@ cBasicQwtLinePlotWidget::cBasicQwtLinePlotWidget(QWidget *pParent) :
     m_pCheckBox_showLegend = new QCheckBox(QString("Show legend"), this);
     insertWidgetIntoControlFrame(m_pCheckBox_showLegend, 3, true);
 
+    //New metatypes:
+    qRegisterMetaType<QList<QwtLegendData> >("QList<QwtLegendData>");
+
     QObject::connect(m_pCheckBox_showLegend, SIGNAL(clicked(bool)), this, SLOT(slotShowLegend(bool)));
 
     //Connections to update plot data as well as labels and scales are forced to be queued as the actual drawing of the widget needs to be done in the GUI thread
     //This allows an update request to come from an arbirary thread to get executed by the GUI thread
     QObject::connect(this, SIGNAL(sigUpdatePlotData()), this, SLOT(slotUpdatePlotData()), Qt::QueuedConnection);
-
-    //Metatypes used elsewhere:
-    qRegisterMetaType<QList<QwtLegendData> >("QList<QwtLegendData>");
 }
 
 cBasicQwtLinePlotWidget::~cBasicQwtLinePlotWidget()
@@ -473,7 +473,7 @@ void cBasicQwtLinePlotWidget::slotDrawVerticalLines(QVector<double> qvdXValues)
 
     for(uint32_t u32LineNo = 0; u32LineNo < (uint32_t)m_qvpVerticalLines.size(); u32LineNo++)
     {
-        m_qvpVerticalLines[u32LineNo] = new QwtPlotMarker();
+        m_qvpVerticalLines[u32LineNo] = new QwtPlotMarker;
         m_qvpVerticalLines[u32LineNo]->setXValue(qvdXValues[u32LineNo]);
         m_qvpVerticalLines[u32LineNo]->setLinePen(QColor(Qt::cyan));
         m_qvpVerticalLines[u32LineNo]->setLineStyle(QwtPlotMarker::VLine);

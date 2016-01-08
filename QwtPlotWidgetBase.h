@@ -24,6 +24,7 @@ typedef unsigned __int64 uint64_t;
 #include <QFont>
 #include <QTimer>
 #include <qwt_interval.h>
+#include <qwt_plot_marker.h>
 
 //Local includes
 #include "QwtPlotPositionPicker.h"
@@ -67,8 +68,8 @@ protected:
     Ui::cQwtPlotWidgetBase              *m_pUI;
 
     //Qwt Plot extensions
-    cQwtPlotPositionPicker*             m_pPlotPositionPicker;
-    cQwtPlotDistancePicker*             m_pPlotDistancePicker;
+    cQwtPlotPositionPicker*             m_pPlotPositionPicker; //For showing current cursor position in text
+    cQwtPlotDistancePicker*             m_pPlotDistancePicker; //For showing current selection dimensions with rectangle rubber band and text
 
     //Plot settings
     QString                             m_qstrTitle;
@@ -95,6 +96,15 @@ protected:
 
     QReadWriteLock                      m_oMutex;
 
+    //Shared mouse position
+    bool                                m_bMousePositionValid; //For sending
+
+    QwtPlotMarker*                      m_pVSharedMousePosition;
+    QwtPlotMarker*                      m_pHSharedMousePosition;
+    bool                                m_bVSharedMousePositionValid; //For receiving
+    bool                                m_bHSharedMousePositionValid;
+
+
     void                                insertWidgetIntoControlFrame(QWidget* pNewWidget, uint32_t u32Index, bool bAddSpacerAfter = false);
 
 public slots:
@@ -105,18 +115,24 @@ public slots:
     void                                slotDisableAutoscale();
     virtual void                        slotStrobeAutoscale(unsigned int u32Delay_ms);
     void                                slotUpdateXScaleDiv(double dMin, double dMax);
+    void                                slotUpdateSharedMousePosition(const QPointF &oPosition, bool bValid);
+    void                                slotUpdateSharedMouseVPosition(const QPointF &oPosition, bool bValid);
+    void                                slotUpdateSharedMouseHPosition(const QPointF &oPosition, bool bValid);
 
 protected slots:
     virtual void                        slotUpdateScalesAndLabels();
     void                                slotSetXScaleBase(int iBase);
     void                                slotGrabFrame();
     virtual void                        slotScaleDivChanged();
+    void                                slotMousePositionChanged(const QPointF &oPosition);
+    void                                slotMousePositionValid(bool bValid);
 
 signals:
     void                                sigUpdateScalesAndLabels();
     void                                sigSetXScaleBase(int iBase);
     void                                sigStrobeAutoscale(unsigned int u32Delay_ms);
     void                                sigXScaleDivChanged(double dMin, double dMax);
+    void                                sigSharedMousePositionChanged(const QPointF &oPosition, bool bValid);
 
 
 };

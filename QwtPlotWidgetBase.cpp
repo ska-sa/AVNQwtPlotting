@@ -27,7 +27,10 @@ cQwtPlotWidgetBase::cQwtPlotWidgetBase(QWidget *pParent) :
     m_bTimestampInTitleEnabled(true),
     m_bDoLogConversion(false),
     m_bDoPowerLogConversion(false),
-    m_bRejectData(true)
+    m_bRejectData(true),
+    m_bMousePositionValid(false),
+    m_bVSharedMousePositionValid(false),
+    m_bHSharedMousePositionValid(false)
 {
     m_pUI->setupUi(this);
 
@@ -39,7 +42,7 @@ cQwtPlotWidgetBase::cQwtPlotWidgetBase(QWidget *pParent) :
     m_oYFont.setPointSizeF(m_oYFont.pointSizeF() * 0.65);
 
     m_oTitleFont = m_pUI->qwtPlot->titleLabel()->font();
-    m_oTitleFont.setPointSizeF(m_oTitleFont.pointSizeF() * 0.7);
+    m_oTitleFont.setPointSizeF(m_oTitleFont.pointSizeF() * 0.6);
 
     //Set up other plot controls
     m_pPlotPositionPicker = new cQwtPlotPositionPicker(QwtPlot::xBottom, QwtPlot::yLeft, QwtPicker::NoRubberBand, QwtPicker::AlwaysOn, m_pUI->qwtPlot->canvas());
@@ -48,6 +51,18 @@ cQwtPlotWidgetBase::cQwtPlotWidgetBase(QWidget *pParent) :
     m_pPlotDistancePicker = new cQwtPlotDistancePicker(QwtPlot::xBottom, QwtPlot::yLeft, QwtPicker::RectRubberBand, QwtPicker::ActiveOnly, m_pUI->qwtPlot->canvas());
     m_pPlotDistancePicker->setMousePattern(QwtEventPattern::MouseSelect1, Qt::LeftButton, Qt::ControlModifier);
     m_pPlotDistancePicker->setTrackerPen(QPen(Qt::white));
+
+    //Shared mouse position;
+    m_pVSharedMousePosition = new QwtPlotMarker;
+    m_pVSharedMousePosition->setLinePen( QColor(Qt::magenta) );
+    m_pVSharedMousePosition->setLineStyle(QwtPlotMarker::HLine);
+    m_pVSharedMousePosition->setLabelOrientation(Qt::Vertical);
+    m_pVSharedMousePosition->setLabelAlignment(Qt::AlignLeft);
+    m_pHSharedMousePosition = new QwtPlotMarker;
+    m_pHSharedMousePosition->setLinePen( QColor(Qt::magenta) );
+    m_pHSharedMousePosition->setLineStyle(QwtPlotMarker::VLine);
+    m_pHSharedMousePosition->setLabelOrientation(Qt::Horizontal);
+    m_pHSharedMousePosition->setLabelAlignment(Qt::AlignTop);
 
     m_pUI->qwtPlot->setAutoReplot(true);
     m_pUI->qwtPlot->enableAxis(QwtPlot::yRight, true);
@@ -67,6 +82,10 @@ cQwtPlotWidgetBase::cQwtPlotWidgetBase(QWidget *pParent) :
     QObject::connect(m_pUI->checkBox_autoscale, SIGNAL(clicked(bool)), this, SLOT(slotEnableAutoscale(bool)));
     QObject::connect(m_pUI->pushButton_grabFrame, SIGNAL(clicked()), this, SLOT(slotGrabFrame()) );
 
+    //Keeping track of current mouse position and whether it is valid. I.e. cursor on plot canvas
+    QObject::connect(m_pPlotPositionPicker, SIGNAL(moved(QPointF)), this, SLOT(slotMousePositionChanged(QPointF)) );
+    QObject::connect(m_pPlotPositionPicker, SIGNAL(activated(bool)), this, SLOT(slotMousePositionValid(bool)) );
+
     //Connections to update plot data as well as labels and scales are forced to be queued as the actual drawing of the widget needs to be done in the GUI thread
     //This allows an update request to come from an arbirary thread to get executed by the GUI thread
     QObject::connect(this, SIGNAL(sigUpdateScalesAndLabels()), this, SLOT(slotUpdateScalesAndLabels()), Qt::QueuedConnection);
@@ -79,6 +98,14 @@ cQwtPlotWidgetBase::cQwtPlotWidgetBase(QWidget *pParent) :
 
 cQwtPlotWidgetBase::~cQwtPlotWidgetBase()
 {
+    //If shared mouse position markers are valid they are attached to plot and will be cleaned up
+    //If not, they need to be deleted
+    if(!m_bHSharedMousePositionValid)
+        delete m_pHSharedMousePosition;
+
+    if(!m_bVSharedMousePositionValid)
+        delete m_pVSharedMousePosition;
+
     delete m_pUI;
 }
 
@@ -336,4 +363,62 @@ void cQwtPlotWidgetBase::slotUpdateXScaleDiv(double dMin, double dMax)
 void cQwtPlotWidgetBase::slotScaleDivChanged()
 {
     sigXScaleDivChanged(m_pUI->qwtPlot->axisInterval(QwtPlot::xBottom).minValue(), m_pUI->qwtPlot->axisInterval(QwtPlot::xBottom).maxValue());
+}
+
+void cQwtPlotWidgetBase::slotMousePositionValid(bool bValid)
+{
+    m_bMousePositionValid = bValid;
+
+    //Explicitly notify when the mouse position is not plot valid.
+    //I.e. mouse cursor is no longer on the plot
+    if(!m_bMousePositionValid)
+        sigSharedMousePositionChanged(QPointF(0.0, 0.0), false);
+}
+
+void cQwtPlotWidgetBase::slotMousePositionChanged(const QPointF &oPosition)
+{
+    //Relay for access outside of this class
+    sigSharedMousePositionChanged(oPosition, m_bMousePositionValid);
+}
+
+void cQwtPlotWidgetBase::slotUpdateSharedMousePosition(const QPointF &oPosition, bool bValid)
+{
+    slotUpdateSharedMouseVPosition(oPosition, bValid);
+    slotUpdateSharedMouseHPosition(oPosition, bValid);
+}
+
+void cQwtPlotWidgetBase::slotUpdateSharedMouseVPosition(const QPointF &oPosition, bool bValid)
+{
+    if(m_bVSharedMousePositionValid && !bValid)
+    {
+        m_pVSharedMousePosition->detach();
+        m_bVSharedMousePositionValid = bValid;
+        return;
+    }
+
+    if(!m_bVSharedMousePositionValid && bValid)
+    {
+        m_pVSharedMousePosition->attach(m_pUI->qwtPlot);
+        m_bVSharedMousePositionValid = bValid;
+    }
+
+    m_pVSharedMousePosition->setYValue(oPosition.y());
+}
+
+void cQwtPlotWidgetBase::slotUpdateSharedMouseHPosition(const QPointF &oPosition, bool bValid)
+{
+    if(m_bHSharedMousePositionValid && !bValid)
+    {
+        m_pHSharedMousePosition->detach();
+        m_bHSharedMousePositionValid = bValid;
+        return;
+    }
+
+    if(!m_bHSharedMousePositionValid && bValid)
+    {
+        m_pHSharedMousePosition->attach(m_pUI->qwtPlot);
+        m_bHSharedMousePositionValid = bValid;
+    }
+
+    m_pHSharedMousePosition->setXValue(oPosition.x());
 }

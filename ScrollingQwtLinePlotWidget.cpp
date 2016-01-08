@@ -4,6 +4,7 @@
 #include <cfloat>
 
 //Library includes
+#include <QThread>
 
 //Local includes
 #include "ScrollingQwtLinePlotWidget.h"
@@ -16,7 +17,9 @@ cScrollingQwtLinePlotWidget::cScrollingQwtLinePlotWidget(QWidget *pParent) :
     cBasicQwtLinePlotWidget(pParent),
     m_dSpanLength(120.0),
     m_dSpanLengthScalingFactor(1.0),
-    m_dLastLogConversionXIndex(-DBL_MAX)
+    m_dPreviousLogConversionXIndex(-DBL_MAX),
+    m_dPreviousOldestXSample(0.0),
+    m_dPreviousNewestXSample(0.0)
 {
     //Add averaging control to GUI
     m_pSpanLengthLabel = new QLabel(QString("Span length"), this);
@@ -130,7 +133,7 @@ void cScrollingQwtLinePlotWidget::logConversion()
         uint32_t u32SampleNo = 0;
         for(; u32SampleNo <  (unsigned)m_qvvdYDataToPlot[u32ChannelNo].size(); u32SampleNo++)
         {
-            if(m_qvdXDataToPlot[u32SampleNo] > m_dLastLogConversionXIndex)
+            if(m_qvdXDataToPlot[u32SampleNo] > m_dPreviousLogConversionXIndex)
             {
                 break;
             }
@@ -142,7 +145,7 @@ void cScrollingQwtLinePlotWidget::logConversion()
         }
     }
 
-    m_dLastLogConversionXIndex = m_qvdXDataToPlot.last();
+    m_dPreviousLogConversionXIndex = m_qvdXDataToPlot.last();
 }
 
 void cScrollingQwtLinePlotWidget::powerLogConversion()
@@ -155,7 +158,7 @@ void cScrollingQwtLinePlotWidget::powerLogConversion()
         uint32_t u32SampleNo = 0;
         for(; u32SampleNo <  (unsigned)m_qvvdYDataToPlot[u32ChannelNo].size(); u32SampleNo++)
         {
-            if(m_qvdXDataToPlot[u32SampleNo] >= m_dLastLogConversionXIndex)
+            if(m_qvdXDataToPlot[u32SampleNo] >= m_dPreviousLogConversionXIndex)
             {
                 break;
             }
@@ -167,7 +170,7 @@ void cScrollingQwtLinePlotWidget::powerLogConversion()
         }
     }
 
-    m_dLastLogConversionXIndex = m_qvdXDataToPlot.last();
+    m_dPreviousLogConversionXIndex = m_qvdXDataToPlot.last();
 }
 
 void cScrollingQwtLinePlotWidget::showSpanLengthControl(bool bEnable)
@@ -205,62 +208,69 @@ void cScrollingQwtLinePlotWidget::slotUpdateScalesAndLabels()
         m_pSpanLengthDoubleSpinBox->setSuffix(QString(" %1").arg(m_qstrXUnit));
 }
 
-void cScrollingQwtLinePlotWidget::slotUpdatePlotData(unsigned int uiCurveNo, QVector<double> qvdXData, QVector<double> qvdYData, int64_t i64Timestamp_us)
+void cScrollingQwtLinePlotWidget::slotUpdatePlotData()
 {
     //Given that X axis is sliding we need a special implementation here
 
     //This function sends data to the actually plot widget in the GUI thread. This is necessary as draw the curve (i.e. updating the GUI) must be done in the GUI thread.
     //Connections to this slot should be queued if from signals not orginating from the GUI thread.
 
-    //cout << "cBasicQwtLinePlotWidget::slotUpdatePlotData() Thread is: " << QThread::currentThread() << endl;
+    //Check that the curves match the source data
+    updateCurves();
 
-    if(uiCurveNo >= (unsigned int)m_qvpPlotCurves.size())
+    for(uint32_t u32CurveNo = 0; u32CurveNo < (uint32_t)m_qvvdYDataToPlot.size(); u32CurveNo++)
     {
-        cout << "cBasicQwtLinePlotWidget::slotUpdatePlotData(): Warning: Requested plotting for curve index "
-             << uiCurveNo << " which is out of range [0, " << m_qvpPlotCurves.size() - 1 << "]. Ignoring." << endl;
 
-        return;
+        if(u32CurveNo >= (unsigned int)m_qvpPlotCurves.size())
+        {
+            cout << "cScrollingQwtLinePlotWidget::slotUpdatePlotData(): Warning: Requested plotting for curve index "
+                 << u32CurveNo << " which is out of range [0, " << m_qvpPlotCurves.size() - 1 << "]. Ignoring." << endl;
+
+            return;
+        }
+
+        m_qvpPlotCurves[u32CurveNo]->setSamples(m_qvdXDataToPlot, m_qvvdYDataToPlot[u32CurveNo]);
     }
 
-    m_qvpPlotCurves[uiCurveNo]->setSamples(qvdXData, qvdYData);
 
+    //This following block diviates from the the base implementation
     if(!m_pPlotZoomer->isCurrentlyAnimating())
     {
-        //Update horizontal scale
-        QRectF oZoomBase = m_pPlotZoomer->zoomBase();
-        QwtInterval oAxisCurrent = m_pUI->qwtPlot->axisInterval(QwtPlot::xBottom);
+        //Extents of the X scale before the new data and after the new data
+        double dOldLength = m_dPreviousNewestXSample - m_dPreviousOldestXSample;
+        double dNewLength = m_qvdXDataToPlot.last() - m_qvdXDataToPlot.first();
 
-        double dShift = qvdXData.last() - oZoomBase.right();
+        //Get the current zoom stack
+        QStack< QRectF > oCurrentStack = m_pPlotZoomer->zoomStack();
 
-        //Ratios of the current X axis scale edges to the overall zoombase length
-        double dRatio1 = (oAxisCurrent.minValue() - oZoomBase.left()) / oZoomBase.width();
-        double dRatio2 = (oAxisCurrent.maxValue() - oZoomBase.left()) / oZoomBase.width();
+        //Set the zoom base to new extend of the data
+        oCurrentStack[0].setLeft(m_qvdXDataToPlot.first());
+        oCurrentStack[0].setRight(m_qvdXDataToPlot.last());
 
-        oZoomBase.setLeft(qvdXData.first() );
-        oZoomBase.setRight(qvdXData.last() );
-
-        if( qvdXData.first() > (oAxisCurrent.maxValue() + dShift) || qvdXData.last() < (oAxisCurrent.minValue() + dShift) || !m_pPlotZoomer->zoomRectIndex())
+        //For the subsequent zoom frames shift them proportionaly to the overall extent update
+        for(uint32_t i = 1; i < (uint32_t)oCurrentStack.size(); i++)
         {
-            //If the new data doesn't lie at all in they current scale then reset to show all data
-            //Also do this if we are not zoom at all
-            m_pUI->qwtPlot->setAxisScale(QwtPlot::xBottom, oZoomBase.left(), oZoomBase.right());
-        }
-        else
-        {
-            //Otherwise shift the scale proportionally to the the length of X added by the new data to zoom base.
-            //Proportional to the current zoom that is.
 
-            double dMin = oZoomBase.left() + oZoomBase.width() * dRatio1;
-            double dMax = oZoomBase.left() + oZoomBase.width() * dRatio2;
+            //Get the ratio that each of sides of the zoom rectangle is of the previous overal X extent
+            double dLeftRatio = (oCurrentStack[i].left() - m_dPreviousOldestXSample) / dOldLength;
+            double dRightRatio = (oCurrentStack[i].right() - m_dPreviousOldestXSample) / dOldLength;
 
-            m_pUI->qwtPlot->setAxisScale(QwtPlot::xBottom, dMin, dMax);
+            //Now use the same ratio to calculate new sides of the zoom rectangle based on the new X extent
+            oCurrentStack[i].setLeft(m_qvdXDataToPlot.first() + dNewLength * dLeftRatio);
+            oCurrentStack[i].setRight(m_qvdXDataToPlot.first() + dNewLength * dRightRatio);
         }
+
+        m_pPlotZoomer->setZoomStack(oCurrentStack, m_pPlotZoomer->zoomRectIndex());
+
+        //The set the new X extent as the old X extent for the next update
+        m_dPreviousOldestXSample = m_qvdXDataToPlot.first();
+        m_dPreviousNewestXSample = m_qvdXDataToPlot.last();
     }
 
     //Update timestamp in Title if needed
     if(m_bTimestampInTitleEnabled)
     {
-        m_pUI->qwtPlot->setTitle( QString("%1 - %2").arg(m_qstrTitle).arg(AVN::stringFromTimestamp_full(i64Timestamp_us).c_str()) );
+        m_pUI->qwtPlot->setTitle( QString("%1 - %2").arg(m_qstrTitle).arg(AVN::stringFromTimestamp_full(m_i64PlotTimestamp_us).c_str()) );
     }
 
     if(m_bIsAutoscaleEnabled)

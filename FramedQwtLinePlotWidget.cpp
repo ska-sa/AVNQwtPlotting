@@ -363,6 +363,10 @@ void cFramedQwtLinePlotWidget::addWaterfallPlot(uint32_t u32ChannelNo, const QSt
         }
     }
 
+    //Connect mouse position indicator of this framed plot and the derived waterfall plot together.
+    QObject::connect(this, SIGNAL(sigSharedMousePositionChanged(QPointF,bool)), pWaterfallPlot, SLOT(slotUpdateSharedMouseHPosition(QPointF,bool)) );
+    QObject::connect(pWaterfallPlot, SIGNAL(sigSharedMousePositionChanged(QPointF,bool)), this, SLOT(slotUpdateSharedMouseHPosition(QPointF,bool)) );
+
     slotScaleDivChanged();
 }
 
@@ -373,8 +377,11 @@ void cFramedQwtLinePlotWidget::removeWaterfallPlot(const QString &qstrChannelNam
     for(uint32_t ui = 0; ui < (uint32_t)m_qvpWaterfallPlots.size();)
     {
         if(m_qvpWaterfallPlots[ui]->getChannelName() == qstrChannelName)
-        {
-            //m_pUI->verticalLayout->removeWidget(m_qvpWaterfallPlots[ui]);
+        {          
+            //Disconnect mouse position indicator of this framed plot and the derived waterfall plot .
+            QObject::disconnect(this, SIGNAL(sigSharedMousePositionChanged(QPointF,bool)), m_qvpWaterfallPlots[ui], SLOT(slotUpdateSharedMouseHPosition(QPointF,bool)) );
+            QObject::disconnect(m_qvpWaterfallPlots[ui], SIGNAL(sigSharedMousePositionChanged(QPointF,bool)), this, SLOT(slotUpdateSharedMouseHPosition(QPointF,bool)) );
+
             delete m_qvpWaterfallPlots[ui];
             m_qvpWaterfallPlots.erase(m_qvpWaterfallPlots.begin() + ui);
 

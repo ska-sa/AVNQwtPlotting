@@ -32,7 +32,7 @@ double cWaterfallPlotSpectromgramData::value( double dX, double dY ) const
 
     //cout << "interval = " << (dY - oYInterval.minValue()) / m_dDeltaY << endl;
 
-    uint32_t ui32Row = uint32_t( (dY - oYInterval.minValue() ) / m_dDeltaY );
+    uint32_t ui32Row = uint32_t( (dY - oYInterval.minValue() ) / m_dDeltaY ) + 1; //+1 Removes wrapped line at the top of waterfall plot which should be at the bottom
     uint32_t ui32Col = uint32_t( (dX - oXInterval.minValue() ) / m_dDeltaX );
 
     // In case of intervals, where the maximum is included
@@ -87,7 +87,7 @@ void cWaterfallPlotSpectromgramData::addFrame(const QVector<float> &qvfNewFrame,
     setInterval(Qt::YAxis, QwtInterval(getMinTime_us() / 1e6, getMaxTime_us() / 1e6));
 }
 
-void cWaterfallPlotSpectromgramData::setDimensions(uint32_t u32X, uint32_t u32Y)
+void cWaterfallPlotSpectromgramData::setDimensions(uint32_t u32X, uint32_t u32Y, int64_t i64LatestTime_us, int64_t i64Span_us)
 {
     m_qvvfCircularBuffer.resize(u32Y);
 
@@ -100,7 +100,29 @@ void cWaterfallPlotSpectromgramData::setDimensions(uint32_t u32X, uint32_t u32Y)
 
     m_u32NColumns = u32X;
     m_u32NRows = u32Y;
+
+    //Optionally back-populate timestamps for a sensical plot timescale on plot initialisation
+    //This will create timestamps from (LatestTime - Span) to LatestTime
+    if(i64LatestTime_us)
+    {
+        for(uint32_t u32Index = 0; u32Index < (uint32_t)m_qvi64Timestamps.size(); u32Index++)
+        {
+            m_qvi64Timestamps[unwrapCircularBufferIndex(u32Index)] = i64LatestTime_us - (m_qvi64Timestamps.size() - 1 - u32Index) * i64Span_us / m_u32NRows;
+            cout << AVN::stringFromTimestamp_full(m_qvi64Timestamps[unwrapCircularBufferIndex(u32Index)]) << endl;
+        }
+    }
 }
+
+uint32_t cWaterfallPlotSpectromgramData::getNColumns()
+{
+    return m_u32NColumns;
+}
+
+uint32_t cWaterfallPlotSpectromgramData::getNRows()
+{
+    return m_u32NRows;
+}
+
 
 void cWaterfallPlotSpectromgramData::update()
 {

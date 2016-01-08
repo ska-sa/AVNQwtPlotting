@@ -37,10 +37,6 @@ typedef unsigned __int64 uint64_t;
 #include "AnimatedQwtPlotZoomer.h"
 #include "WallTimeQwtScaleDraw.h"
 
-namespace Ui {
-class cWaterfallQwtPlotWidget;
-}
-
 class cWaterfallQwtPlotWidget : public cQwtPlotWidgetBase
 {
     Q_OBJECT
@@ -85,6 +81,8 @@ private:
     QDoubleSpinBox                      *m_pIntensityFloorSpinBox;
     QLabel                              *m_pIntensityFloorLabel;
     QLabel                              *m_pIntensityCeilingLabel;
+    QSpinBox                            *m_pTimeSpanSpinBox_s;
+    QLabel                              *m_pTimeSpanLabel;
 
     uint32_t                            m_u32ChannelNo;
     QString                             m_qstrChannelName;

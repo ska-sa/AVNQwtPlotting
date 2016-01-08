@@ -31,7 +31,9 @@ public:
     virtual void                setInterval(Qt::Axis eAxis, const QwtInterval & oInterval);
 
     void                        addFrame(const QVector<float> &qvfNewFrame, int64_t i64Timestamp_us);
-    void                        setDimensions(uint32_t u32X, uint32_t u32Y);
+    void                        setDimensions(uint32_t u32X, uint32_t u32Y, int64_t i64LatestTime_us = 0, int64_t i64Span_us = 0);
+    uint32_t                    getNColumns();
+    uint32_t                    getNRows();
 
     int64_t                     getMinTime_us() const;
     int64_t                     getMaxTime_us() const;

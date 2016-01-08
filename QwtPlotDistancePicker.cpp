@@ -17,6 +17,7 @@ cQwtPlotDistancePicker::cQwtPlotDistancePicker(int iXAxis, int iYAxis, RubberBan
   #endif
 {
     setStateMachine( new QwtPickerDragRectMachine );
+    setRubberBand(RectRubberBand);
     setRubberBandPen(QPen(Qt::cyan));
     setMousePattern( QwtEventPattern::MouseSelect1, Qt::RightButton);
 }

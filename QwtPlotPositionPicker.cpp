@@ -1,6 +1,7 @@
 //System includes
 
 //Library includes
+#include <qwt_picker_machine.h>
 
 //Local includes
 #include "QwtPlotPositionPicker.h"
@@ -9,14 +10,17 @@
 #if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
 cQwtPlotPositionPicker::cQwtPlotPositionPicker(int iXAxis, int iYAxis, RubberBand oRubberBand, DisplayMode oTrackerMode, QwtPlotCanvas *pCanvas) :
     QwtPlotPicker(iXAxis, iYAxis, oRubberBand, oTrackerMode, pCanvas),
-  #else
+    #else
 cQwtPlotPositionPicker::cQwtPlotPositionPicker(int iXAxis, int iYAxis, RubberBand oRubberBand, DisplayMode oTrackerMode, QWidget *pCanvas) :
     QwtPlotPicker(iXAxis, iYAxis, oRubberBand, oTrackerMode, pCanvas),
-  #endif
+    #endif
     m_bXIsTime(false),
     m_bYIsTime(false)
 {
+    setStateMachine( new QwtPickerTrackerMachine );
     setMousePattern( QwtEventPattern::MouseSelect1, Qt::NoButton);
+    setRubberBand(CrossRubberBand);
+    setRubberBandPen(QPen( QColor(Qt::magenta) ) );
 }
 
 void cQwtPlotPositionPicker::setXUnit(const QString &qstrXUnit)

@@ -1,6 +1,7 @@
 //System includes
 #include <iostream>
 #include <cmath>
+#include <climits>
 
 //Library includes
 #include <qwt_text_label.h>
@@ -35,14 +36,25 @@ cWaterfallQwtPlotWidget::cWaterfallQwtPlotWidget(uint32_t u32ChannelNo, const QS
     m_pIntensityCeilingSpinBox->setMaximum(1e10);
     m_pIntensityCeilingSpinBox->setMinimum(-1e10);
 
+    m_pTimeSpanLabel = new QLabel(QString("Time span"), this);
+    m_pTimeSpanSpinBox_s = new QSpinBox(this);
+    m_pTimeSpanSpinBox_s->setMinimum(1);
+    m_pTimeSpanSpinBox_s->setMaximum(INT32_MAX);
+    m_pTimeSpanSpinBox_s->setValue(120); //Default span 2 minutes
+    m_pTimeSpanSpinBox_s->setSuffix(QString(" s"));
+
     insertWidgetIntoControlFrame(m_pIntensityFloorLabel, 3);
     insertWidgetIntoControlFrame(m_pIntensityFloorSpinBox, 4, true);
     insertWidgetIntoControlFrame(m_pIntensityCeilingLabel, 6);
     insertWidgetIntoControlFrame(m_pIntensityCeilingSpinBox, 7, true);
+    insertWidgetIntoControlFrame(m_pTimeSpanLabel, 9);
+    insertWidgetIntoControlFrame(m_pTimeSpanSpinBox_s, 10, true);
 
+    //Constructs for waterfall plots
     m_pPlotSpectrogram = new QwtPlotSpectrogram;
     m_pSpectrogramData = new cWaterfallPlotSpectromgramData;
 
+    //Automatic assign plot rendering threads based on available hardware
     m_pPlotSpectrogram->setRenderThreadCount(0);
 
     //Setup the colorMap for the spectrogram
@@ -72,7 +84,8 @@ cWaterfallQwtPlotWidget::cWaterfallQwtPlotWidget(uint32_t u32ChannelNo, const QS
     m_pPlotSpectrogram->attach(m_pUI->qwtPlot);
     m_pPlotSpectrogram->setCachePolicy(QwtPlotRasterItem::PaintCache);
 
-    m_pSpectrogramData->setDimensions(0, 200);
+    //The last 2 arguments here back populate timestamps so that the plots starts up with logical values on the timescale
+    m_pSpectrogramData->setDimensions(0, 200, AVN::getTimeNow_us(), m_pTimeSpanSpinBox_s->value() * 1000000);
 
     //Offset width of colour bar in right hand plot spacing
     m_pUI->qwtPlot->axisScaleDraw(QwtPlot::yRight)->setMinimumExtent(m_pUI->qwtPlot->axisScaleDraw(QwtPlot::yRight)->minimumExtent()
@@ -128,8 +141,9 @@ void cWaterfallQwtPlotWidget::addData(const QVector<float> &qvfYData, int64_t i6
     }
     m_u32AverageCount++;
 
-    //Try to get approximately 10 lines per second
-    if(i64Timestamp_us - m_pSpectrogramData->getMaxTime_us() < 100000)
+    //Use span as per set in the GUI to determine how long to average for before adding a new line.
+    //Essentially number of rows * average time per row = span time
+    if( i64Timestamp_us - m_pSpectrogramData->getMaxTime_us() < (int64_t)m_pTimeSpanSpinBox_s->value() * 1000000 / m_pSpectrogramData->getNRows() )
     {
         return;
     }
@@ -237,7 +251,6 @@ void cWaterfallQwtPlotWidget::slotUpdateData()
     }
 
     m_pUI->qwtPlot->setAxisScale(QwtPlot::yLeft, m_pSpectrogramData->getMaxTime_us() / 1e6, m_pSpectrogramData->getMinTime_us() / 1e6);
-
 }
 
 void cWaterfallQwtPlotWidget::slotEnableAutoscale(bool bEnable)

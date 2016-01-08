@@ -50,9 +50,9 @@ protected:
     double                              m_dSpanLengthScalingFactor;
     QString                             m_qstrSpanLengthSpinBoxUnitOveride;
 
-    double                              m_dLastLogConversionXIndex;
-
-    virtual void                        slotUpdatePlotData(unsigned int uiCurveNo, QVector<double> qvdXData, QVector<double> qvdYData, int64_t i64Timestamp_us);
+    double                              m_dPreviousLogConversionXIndex;
+    double                              m_dPreviousOldestXSample;
+    double                              m_dPreviousNewestXSample;
 
     virtual void                        processXData(const QVector<float> &qvfXData, int64_t i64Timestamp_us = 0);
     virtual void                        processYData(const QVector<QVector<float> > &qvvfXData, int64_t i64Timestamp_us = 0, const QVector<uint32_t> &qvu32ChannelList = QVector<uint32_t>());
@@ -61,6 +61,7 @@ protected:
     virtual void                        powerLogConversion();
 
 protected slots:
+    virtual void                        slotUpdatePlotData();
     virtual void                        slotUpdateScalesAndLabels();
 
 public slots:
