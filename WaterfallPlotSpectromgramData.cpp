@@ -25,8 +25,6 @@ double cWaterfallPlotSpectromgramData::value( double dX, double dY ) const
 {
     //Adapted from qwt_matrix_raster_data.cpp
 
-    //cout << "dY = " << AVN::stringFromTimestamp_HHmmss(dY * 1e6) << endl;
-
     const QwtInterval oXInterval = interval( Qt::XAxis );
     const QwtInterval oYInterval = interval( Qt::YAxis );
 
@@ -103,12 +101,12 @@ void cWaterfallPlotSpectromgramData::setDimensions(uint32_t u32X, uint32_t u32Y,
 
     //Optionally back-populate timestamps for a sensical plot timescale on plot initialisation
     //This will create timestamps from (LatestTime - Span) to LatestTime
+
     if(i64LatestTime_us)
     {
         for(uint32_t u32Index = 0; u32Index < (uint32_t)m_qvi64Timestamps.size(); u32Index++)
         {
             m_qvi64Timestamps[unwrapCircularBufferIndex(u32Index)] = i64LatestTime_us - (m_qvi64Timestamps.size() - 1 - u32Index) * i64Span_us / m_u32NRows;
-            cout << AVN::stringFromTimestamp_full(m_qvi64Timestamps[unwrapCircularBufferIndex(u32Index)]) << endl;
         }
     }
 }
