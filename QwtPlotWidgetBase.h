@@ -18,7 +18,7 @@ typedef unsigned __int64 uint64_t;
 #endif
 
 //Library includes
-#include <QWidget>
+#include <QMainWindow>
 #include <QString>
 #include <QReadWriteLock>
 #include <QFont>
@@ -34,7 +34,7 @@ namespace Ui {
 class cQwtPlotWidgetBase;
 }
 
-class cQwtPlotWidgetBase : public QWidget
+class cQwtPlotWidgetBase : public QMainWindow //Plotting widget contains QDockWidget. It must therefore be of type QMainWindow to allow docking to work correctly (Qt caveat).
 {
     Q_OBJECT
 

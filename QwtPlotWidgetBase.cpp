@@ -20,7 +20,7 @@
 using namespace std;
 
 cQwtPlotWidgetBase::cQwtPlotWidgetBase(QWidget *pParent) :
-    QWidget(pParent),
+    QMainWindow(pParent),
     m_pUI(new Ui::cQwtPlotWidgetBase),
     m_bIsPaused(false),
     m_bIsAutoscaleEnabled(false),
@@ -33,6 +33,10 @@ cQwtPlotWidgetBase::cQwtPlotWidgetBase(QWidget *pParent) :
     m_bHSharedMousePositionValid(false)
 {
     m_pUI->setupUi(this);
+
+    //All items are in the dock widget which is not part of the central widget by definition.
+    //The MainWindow must however always have a central widget which comes up as an empty block so hide it.
+    m_pUI->centralwidget->setVisible(false);
 
     //Make the axis and title font a little bit smaller
     m_oXFont = m_pUI->qwtPlot->axisTitle(QwtPlot::xBottom).font();
