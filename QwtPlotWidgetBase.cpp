@@ -34,8 +34,12 @@ cQwtPlotWidgetBase::cQwtPlotWidgetBase(QWidget *pParent) :
 {
     m_pUI->setupUi(this);
 
-    //All items are in the dock widget which is not part of the central widget by definition.
-    //The MainWindow must however always have a central widget which comes up as an empty block so hide it.
+    //DockWidgets must exist in a MainWindow which is why this class derives MainWindow.
+    //This widget can then still be put into a parent MainWindow (the actual MainWindow
+    //of the application) and be used like a normal Widget.
+
+    //All items for the plotting exist in the DockWidget which, in turn, is not in the parent MainWindow's central widget
+    //QMainWindow must however always have a central widget which comes up as an empty block. Therefore, hide it.
     m_pUI->centralwidget->setVisible(false);
 
     //Make the axis and title font a little bit smaller
@@ -98,6 +102,8 @@ cQwtPlotWidgetBase::cQwtPlotWidgetBase(QWidget *pParent) :
     QObject::connect(this, SIGNAL(sigStrobeAutoscale(unsigned int)), this, SLOT(slotStrobeAutoscale(unsigned int)), Qt::QueuedConnection);
 
     QObject::connect(m_pUI->qwtPlot->axisWidget(QwtPlot::xBottom), SIGNAL(scaleDivChanged()), this, SLOT(slotScaleDivChanged()) );
+
+    QObject::connect(m_pUI->dockWidget, SIGNAL(topLevelChanged(bool)), this, SLOT(slotPlotUndocked(bool) ) );
 }
 
 cQwtPlotWidgetBase::~cQwtPlotWidgetBase()
@@ -425,4 +431,20 @@ void cQwtPlotWidgetBase::slotUpdateSharedMouseHPosition(const QPointF &oPosition
     }
 
     m_pHSharedMousePosition->setXValue(oPosition.x());
+}
+
+void cQwtPlotWidgetBase::slotPlotUndocked(bool bUndocked)
+{
+    cout << "cQwtPlotWidgetBase::slotPlotUndocked(): Got undocked = " << bUndocked << " for plot " << m_qstrTitle.toStdString() << endl;
+
+    //If the dockWidget is undocked, hide the parent window to relieve space in main GUI
+    if(bUndocked)
+    {
+        setVisible(false);
+    }
+    else
+    {
+        setVisible(true);
+    }
+
 }

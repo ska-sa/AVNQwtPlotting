@@ -126,6 +126,7 @@ protected slots:
     virtual void                        slotScaleDivChanged();
     void                                slotMousePositionChanged(const QPointF &oPosition);
     void                                slotMousePositionValid(bool bValid);
+    void                                slotPlotUndocked(bool bUndocked);
 
 signals:
     void                                sigUpdateScalesAndLabels();
