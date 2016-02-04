@@ -62,7 +62,7 @@
    </property>
    <property name="minimumSize">
     <size>
-     <width>278</width>
+     <width>297</width>
      <height>51</height>
     </size>
    </property>
@@ -70,7 +70,7 @@
     <bool>false</bool>
    </property>
    <property name="features">
-    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable</set>
+    <set>QDockWidget::DockWidgetFloatable|QDockWidget::DockWidgetMovable|QDockWidget::DockWidgetVerticalTitleBar</set>
    </property>
    <property name="allowedAreas">
     <set>Qt::TopDockWidgetArea</set>
