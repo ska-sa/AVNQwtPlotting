@@ -73,9 +73,6 @@ cBasicQwtLinePlotWidget::cBasicQwtLinePlotWidget(QWidget *pParent) :
     m_pCheckBox_showLegend = new QCheckBox(QString("Show legend"), this);
     insertWidgetIntoControlFrame(m_pCheckBox_showLegend, 3, true);
 
-    //New metatypes:
-    qRegisterMetaType<QList<QwtLegendData> >("QList<QwtLegendData>");
-
     QObject::connect(m_pCheckBox_showLegend, SIGNAL(clicked(bool)), this, SLOT(slotShowLegend(bool)));
 
     //Connections to update plot data as well as labels and scales are forced to be queued as the actual drawing of the widget needs to be done in the GUI thread
