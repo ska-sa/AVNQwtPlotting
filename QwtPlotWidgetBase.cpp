@@ -5,7 +5,10 @@
 //Library includes
 #include <QPen>
 #include <QPrinter>
-#include <QPrintDialog>
+#if QWT_VERSION < 0x060100 //For implementation of plot exporting in old versions of Qwt
+#include <QFileDialog>
+#include <QImageWriter>
+#endif
 #include <QDebug>
 #include <qwt_scale_engine.h>
 #include <qwt_plot_renderer.h>
@@ -257,7 +260,54 @@ void cQwtPlotWidgetBase::slotGrabFrame()
     QwtPlotRenderer oRenderer;
 
 #if QWT_VERSION < 0x060100 //Account for Ubuntu's typically outdated package versions
-    oRenderer.renderDocument(m_pUI->qwtPlot, QString("%1").arg(m_pUI->qwtPlot->title().text()), QSizeF(297.0, 210.0), 300);
+
+    //Implement Qwt's new exportTo function (copied and adapted from Qwt source):
+
+    if ( m_pUI->qwtPlot == NULL )
+        return;
+
+    QString qstrFileName = QString("%1").arg(m_pUI->qwtPlot->title().text());
+
+    // What about translation
+
+#ifndef QT_NO_FILEDIALOG
+    const QList<QByteArray> qlImageFormats = QImageWriter::supportedImageFormats();
+
+    QStringList oFilter;
+#ifndef QT_NO_PRINTER
+    oFilter += QString( "PDF " ) + tr( "Documents" ) + " (*.pdf)";
+#endif
+#ifndef QWT_NO_SVG
+    oFilter += QString( "SVG " ) + tr( "Documents" ) + " (*.svg)";
+#endif
+#ifndef QT_NO_PRINTER
+    oFilter += QString( "Postscript " ) + tr( "Documents" ) + " (*.ps)";
+#endif
+
+    if ( qlImageFormats.size() > 0 )
+    {
+        QString qstrImageFilter( tr( "Images" ) );
+        qstrImageFilter += " (";
+        for ( int i = 0; i < qlImageFormats.size(); i++ )
+        {
+            if ( i > 0 )
+                qstrImageFilter += " ";
+            qstrImageFilter += "*.";
+            qstrImageFilter += qlImageFormats[i];
+        }
+        qstrImageFilter += ")";
+
+        oFilter += qstrImageFilter;
+    }
+
+    qstrFileName = QFileDialog::getSaveFileName(NULL, tr( "Export File Name" ), qstrFileName, oFilter.join( ";;" ), NULL, QFileDialog::DontConfirmOverwrite );
+#endif
+    if ( qstrFileName.isEmpty() )
+        return;
+
+    QSizeF oSize(297.0, 210.0);
+    oRenderer.renderDocument( m_pUI->qwtPlot, qstrFileName, oSize, 300 );
+
 #else
     oRenderer.exportTo(m_pUI->qwtPlot, QString("%1").arg(m_pUI->qwtPlot->title().text()), QSizeF(297.0, 210.0), 300);
 #endif
