@@ -102,6 +102,10 @@ private slots:
     virtual void                        slotUpdateScalesAndLabels();
     void                                slotWaterFallPlotEnabled(QAction* pAction);
     virtual void                        slotScaleDivChanged();
+    void                                slotSetXScaleExtent(double dBegin, double dEnd);
+
+signals:
+    void                                sigSetXScaleExtent(double dBegin, double dEnd);
 
 };
 

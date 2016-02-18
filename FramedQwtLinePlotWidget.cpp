@@ -40,6 +40,9 @@ cFramedQwtLinePlotWidget::cFramedQwtLinePlotWidget(QWidget *pParent) :
 
     QObject::connect(m_pAveragingSpinBox, SIGNAL(valueChanged(int)), this, SLOT(slotSetAverage(int)));
     QObject::connect(m_pWaterfallMenu, SIGNAL(triggered(QAction*)), this, SLOT(slotWaterFallPlotEnabled(QAction*)));
+
+    //GUI thread decoupling connections
+    QObject::connect(this, SIGNAL(sigSetXScaleExtent(double,double)), this, SLOT(slotSetXScaleExtent(double,double)), Qt::QueuedConnection);
 }
 
 cFramedQwtLinePlotWidget::~cFramedQwtLinePlotWidget()
@@ -82,8 +85,6 @@ void cFramedQwtLinePlotWidget::processXData(const QVector<float> &qvfXData, int6
         {
             m_qvdXDataToPlot[u32XTick] = m_dXBegin + u32XTick * dInterval;
         }
-
-        m_bXSpanChanged = false;
     }
 
     m_oMutex.unlock();
@@ -266,10 +267,17 @@ void cFramedQwtLinePlotWidget::setXSpan(double dXBegin, double dXEnd)
         }
     }
 
+    sigSetXScaleExtent(dXBegin, dXEnd); //Execute in GUI thread
+
+
     //Flag for ploting code to update
     m_bXSpanChanged = true;
 }
 
+void cFramedQwtLinePlotWidget::slotSetXScaleExtent(double dBegin, double dEnd)
+{
+    m_pUI->qwtPlot->setAxisScale(QwtPlot::xBottom, dBegin, dEnd);
+}
 
 void cFramedQwtLinePlotWidget::slotSetAverage(int iAveraging)
 {
